@@ -7,6 +7,6 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = &arena.allocator;
 
-    const res = try linenoise.linenoise("hello> ", allocator);
+    const res = try linenoise.linenoise(allocator, "hello> ");
     std.debug.warn("input: {}\n", .{ res });
 }

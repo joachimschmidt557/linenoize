@@ -4,32 +4,34 @@ const ArrayList = std.ArrayList;
 const Buffer = std.Buffer;
 const File = std.fs.File;
 
+const termios = @cImport({
+    @cInclude("termios.h");
+});
+
 const unsupported_term = [_][]const u8 { "dumb", "cons25", "emacs" };
 
 const CompletionCallback = fn(input: []u8) void;
 const HintsCallback = fn(input: []u8, color: i32, bold: bool) []u8;
 
-const KeyAction = enum {
-    KeyNull = 0,
-    CtrlA = 1,
-    CtrlB = 2,
-    CtrlC = 3,
-    CtrlD = 4,
-    CtrlE = 5,
-    CtrlF = 6,
-    CtrlH = 8,
-    Tab = 9,
-    CtrlK = 11,
-    CtrlL = 12,
-    Enter = 13,
-    CtrlN = 14,
-    CtrlP = 16,
-    CtrlT = 20,
-    CtrlU = 21,
-    CtrlW = 23,
-    Esc = 27,
-    Backspace = 127,
-};
+const key_null = 0;
+const key_ctrl_a = 1;
+const key_ctrl_b = 2;
+const key_ctrl_c = 3;
+const key_ctrl_d = 4;
+const key_ctrl_e = 5;
+const key_ctrl_f = 6;
+const key_ctrl_h = 8;
+const key_tab = 9;
+const key_ctrl_k = 11;
+const key_ctrl_l = 12;
+const key_enter = 13;
+const key_ctrl_n = 14;
+const key_ctrl_p = 16;
+const key_ctrl_t = 20;
+const key_ctrl_u = 21;
+const key_ctrl_w = 23;
+const key_bsc = 27;
+const key_backspace = 127;
 
 fn isUnsupportedTerm() bool {
     const env_var = std.os.getenv("TERM") orelse return false;
@@ -40,10 +42,31 @@ fn isUnsupportedTerm() bool {
     } else false;
 }
 
-fn enableRawMode(fd: File) void {
+fn enableRawMode(fd: File) termios.termios {
+    var orig: termios.termios = undefined;
+    var raw: termios.termios = undefined;
+
+    _ = termios.tcgetattr(fd.handle, &orig);
+    raw = orig;
+
+    raw.c_iflag &= ~(@intCast(c_uint, termios.BRKINT) | @intCast(c_uint, termios.ICRNL) | @intCast(c_uint, termios.INPCK) | @intCast(c_uint, termios.ISTRIP) | @intCast(c_uint, termios.IXON));
+
+    raw.c_oflag &= ~(@intCast(c_uint, termios.OPOST));
+
+    raw.c_cflag |= (@intCast(c_uint, termios.CS8));
+
+    raw.c_lflag &= ~(@intCast(c_uint, termios.ECHO) | @intCast(c_uint, termios.ICANON) | @intCast(c_uint, termios.IEXTEN) | @intCast(c_uint, termios.ISIG));
+
+    raw.c_cc[termios.VMIN] = 1;
+    raw.c_cc[termios.VTIME] = 0;
+
+    _ = termios.tcsetattr(fd.handle, termios.TCSAFLUSH, &raw);
+
+    return orig;
 }
 
-fn disableRawMode(fd: File) void {
+fn disableRawMode(fd: File, orig: termios.termios) void {
+    _ = termios.tcsetattr(fd.handle, termios.TCSAFLUSH, &orig);
 }
 
 fn getCursorPosition(in: File, out: File) !usize {
@@ -205,20 +228,43 @@ fn linenoiseEdit(in: File, out: File, prompt: []const u8) []const u8 {
     var state = Linenoise{
         .stdin = in,
         .stdout = out,
+
+        .prompt = prompt,
     };
 
     while (true) {
         switch (c) {
+            key_null => {},
+            key_ctrl_a => {},
+            key_ctrl_b => {},
+            key_ctrl_c => {},
+            key_ctrl_d => {},
+            key_ctrl_e => {},
+            key_ctrl_f => {},
+            key_ctrl_h => {},
+            key_tab => {},
+            key_ctrl_k => {},
+            key_ctrl_l => {},
+            key_enter => {},
+            key_ctrl_n => {},
+            key_ctrl_p => {},
+            key_ctrl_t => {},
+            key_ctrl_u => {},
+            key_ctrl_w => {},
+            key_bsc => {},
+            key_backspace => {},
             else => state.editInsert(c),
         }
     }
 }
 
-fn linenoiseRaw(in: File, out: File, prompt: []const u8) []const u8 {
-    enableRawMode(in);
-    disableRawMode(in);
+fn linenoiseRaw(in: File, out: File, prompt: []const u8) ![]const u8 {
+    const orig = enableRawMode(in);
+    const result = linenoiseEdit(in, out, prompt);
+    disableRawMode(in, orig);
+
     try out.write("\n");
-    return "";
+    return result;
 }
 
 fn linenoiseNoTTY(alloc: *Allocator) ![]const u8 {
@@ -226,7 +272,7 @@ fn linenoiseNoTTY(alloc: *Allocator) ![]const u8 {
     return try std.io.readLine(&buf);
 }
 
-pub fn linenoise(prompt: []const u8, alloc: *Allocator) ![]const u8 {
+pub fn linenoise(alloc: *Allocator, prompt: []const u8) ![]const u8 {
     const stdin_file = std.io.getStdIn();
     const stdout_file = std.io.getStdOut();
 
@@ -236,7 +282,7 @@ pub fn linenoise(prompt: []const u8, alloc: *Allocator) ![]const u8 {
 
             return "";
         } else {
-            return linenoiseRaw(stdin_file, stdout_file, prompt);
+            return try linenoiseRaw(stdin_file, stdout_file, prompt);
         }
     } else {
         return try linenoiseNoTTY(alloc);
