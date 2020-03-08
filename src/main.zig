@@ -8,6 +8,12 @@ const termios = @cImport({
     @cInclude("termios.h");
 });
 
+const ioctl = @cImport({
+    @cInclude("sys/ioctl.h");
+});
+
+const LinenoiseState = @import("state.zig").LinenoiseState;
+
 const unsupported_term = [_][]const u8 { "dumb", "cons25", "emacs" };
 
 const CompletionCallback = fn(input: []u8) void;
@@ -42,11 +48,14 @@ fn isUnsupportedTerm() bool {
     } else false;
 }
 
-fn enableRawMode(fd: File) termios.termios {
+fn enableRawMode(fd: File) !termios.termios {
     var orig: termios.termios = undefined;
     var raw: termios.termios = undefined;
 
-    _ = termios.tcgetattr(fd.handle, &orig);
+    if (termios.tcgetattr(fd.handle, &orig) < 0) {
+        return error.GetAttr;
+    }
+
     raw = orig;
 
     raw.c_iflag &= ~(@intCast(c_uint, termios.BRKINT) | @intCast(c_uint, termios.ICRNL) | @intCast(c_uint, termios.INPCK) | @intCast(c_uint, termios.ISTRIP) | @intCast(c_uint, termios.IXON));
@@ -60,7 +69,9 @@ fn enableRawMode(fd: File) termios.termios {
     raw.c_cc[termios.VMIN] = 1;
     raw.c_cc[termios.VTIME] = 0;
 
-    _ = termios.tcsetattr(fd.handle, termios.TCSAFLUSH, &raw);
+    if (termios.tcsetattr(fd.handle, termios.TCSAFLUSH, &raw) < 0) {
+        return error.SetAttr;
+    }
 
     return orig;
 }
@@ -74,217 +85,106 @@ fn getCursorPosition(in: File, out: File) !usize {
 }
 
 fn getColumns(in: File, out: File) usize {
+    var ws: ioctl.winsize = undefined;
+
+    if (ioctl.ioctl(1, ioctl.TIOCGWINSZ, &ws) == -1 or ws.ws_col == 0) {
+        // ioctl() didn't work
+    } else {
+        return ws.ws_col;
+    }
+
     return 80;
 }
 
 pub const LinenoiseCompletions = ArrayList([]const u8);
 
-pub const Linenoise = struct {
-    alloc: *Allocator,
+fn linenoiseEdit(allocator: *Allocator, in: File, out: File, err: File, prompt: []const u8) ![]const u8 {
+    var state = LinenoiseState {
+        .alloc = allocator,
 
-    stdin: File,
-    stdout: File,
-    stderr: File,
-    buf: []u8,
-    prompt: []const u8,
-    pos: usize,
-    oldpos: usize,
-    size: usize,
-    cols: usize,
-    maxrows: usize,
-    history_index: i32,
-
-    completions: LinenoiseCompletions,
-
-    history: [][]u8,
-
-    rawmode: bool,
-    mlmode: bool,
-
-    const Self = @This();
-
-    pub fn clearScreen(self: *Self) !void {
-        try self.stdout.write("\x1b[H\x1b[2J");
-    }
-
-    pub fn beep(self: *Self) void {
-        try self.stderr.write("\x07");
-    }
-
-    pub fn completeLine(self: *Self) void {
-        if (self.completions.len == 0) {
-            self.beep();
-        }
-    }
-
-    fn refreshShowHints(self: *Self, buf: ArrayList(u8)) void {
-    }
-
-    fn refreshSingleLine(self: *Self) void {
-        var buf = ArrayList(u8).init(self.alloc);
-        defer buf.deinit();
-
-        // Move cursor to left edge
-        buf.appendSlice("\r");
-
-        // Write prompt
-        buf.appendSlice(self.prompt);
-
-        // Write current buffer content
-        buf.appendSlice(self.buf);
-
-        // Show hints
-        self.refreshShowHints(buf);
-
-        // Erase to the right
-        buf.appendSlice("\x1b[0K");
-
-        // Move cursor to original position
-        buf.appendSlice("\r\x1b[%dC");
-
-        // Write buffer
-        self.stdin.write(buf.toSliceConst());
-    }
-
-    fn refreshMultiLine(self: *Self) void {
-    }
-
-    pub fn refreshLine(self: *Self) void {
-        if (self.mlmode) {
-            self.refreshMultiLine();
-        } else {
-            self.refreshSingleLine();
-        }
-    }
-
-    fn editInsert(self: *Self, c: u8) void {
-        if (self.len < self.buf.len) {
-            if (self.len == self.pos) {
-            } else {
-                self.buf[self.pos] = c;
-                self.len += 1;
-                self.pos += 1;
-                self.refreshLine();
-            }
-        }
-    }
-
-    fn editMoveLeft(self: *Self) void {
-        if (self.pos > 0) {
-            self.pos -= 1;
-            self.refreshLine();
-        }
-    }
-
-    fn editMoveRight(self: *Self) void {
-        if (self.pos > 0) {
-            self.pos += 1;
-            self.refreshLine();
-        }
-    }
-
-    fn editMoveHome(self: *Self) void {
-        if (self.pos != 0) {
-            self.pos = 0;
-            self.refreshLine();
-        }
-    }
-
-    fn editMoveEnd(self: *Self) void {
-        if (self.pos != self.len) {
-            self.pos = self.len;
-            self.refreshLine();
-        }
-    }
-
-    fn editDelete(self: *Self) void {
-        if (self.len > 0 and self.pos < self.len) {
-            for (self.buf[self.pos..self.len-1]) |_, i| {
-                self.buf[i] = self.buf[i+1];
-            }
-            self.len -= 1;
-            self.buf[self.len] = 0;
-            self.refreshLine();
-        }
-    }
-
-    fn editBackspace(self: *Self) void {
-        if (self.len > 0 and self.pos < self.len) {
-            for (self.buf[self.pos..self.len-1]) |_, i| {
-                self.buf[i] = self.buf[i+1];
-            }
-            self.len -= 1;
-            self.pos -= 1;
-            self.buf[self.len] = 0;
-            self.refreshLine();
-        }
-    }
-
-    fn editDeletePrevWord(self: *Self) void {
-    }
-};
-
-fn linenoiseEdit(in: File, out: File, prompt: []const u8) []const u8 {
-    var state = Linenoise{
         .stdin = in,
         .stdout = out,
-
+        .stderr = err,
         .prompt = prompt,
+
+        .buf = try Buffer.initSize(allocator, 0),
+
+        .pos = 0,
+        .oldpos = 0,
+        .size = 0,
+        .cols = getColumns(in, out),
+        .maxrows = 0,
+        .history_index = 0,
+
+        .mlmode = false,
     };
 
+    try out.writeAll(prompt);
+
     while (true) {
+        var input_buf: [1]u8 = undefined;
+        const nread = try in.read(&input_buf);
+        const c = if (nread == 1) input_buf[0] else return "";
+
         switch (c) {
             key_null => {},
-            key_ctrl_a => {},
-            key_ctrl_b => {},
+            key_ctrl_a => try state.editMoveHome(),
+            key_ctrl_b => try state.editMoveLeft(),
             key_ctrl_c => {},
-            key_ctrl_d => {},
-            key_ctrl_e => {},
-            key_ctrl_f => {},
+            key_ctrl_d => {
+                if (state.buf.len() > 0) {
+                    try state.editDelete();
+                } else {
+                    return "";
+                }
+            },
+            key_ctrl_e => try state.editMoveEnd(),
+            key_ctrl_f => try state.editMoveRight(),
             key_ctrl_h => {},
             key_tab => {},
-            key_ctrl_k => {},
-            key_ctrl_l => {},
-            key_enter => {},
+            key_ctrl_k => try state.editKillLineForward(),
+            key_ctrl_l => try state.clearScreen(),
+            key_enter => return state.buf.span(),
             key_ctrl_n => {},
             key_ctrl_p => {},
-            key_ctrl_t => {},
-            key_ctrl_u => {},
+            key_ctrl_t => try state.editSwapPrev(),
+            key_ctrl_u => try state.editKillLineBackward(),
             key_ctrl_w => {},
             key_bsc => {},
-            key_backspace => {},
-            else => state.editInsert(c),
+            key_backspace => try state.editBackspace(),
+            else => try state.editInsert(c),
         }
     }
 }
 
-fn linenoiseRaw(in: File, out: File, prompt: []const u8) ![]const u8 {
-    const orig = enableRawMode(in);
-    const result = linenoiseEdit(in, out, prompt);
+fn linenoiseRaw(allocator: *Allocator, in: File, out: File, err: File, prompt: []const u8) ![]const u8 {
+    const orig = try enableRawMode(in);
+    const result = try linenoiseEdit(allocator, in, out, err, prompt);
     disableRawMode(in, orig);
 
-    try out.write("\n");
+    try out.writeAll("\n");
     return result;
 }
 
-fn linenoiseNoTTY(alloc: *Allocator) ![]const u8 {
-    var buf = Buffer.initNull(alloc);
-    return try std.io.readLine(&buf);
+fn linenoiseNoTTY(alloc: *Allocator, stdin: File) ![]const u8 {
+    var stream = stdin.inStream().stream;
+    return try stream.readUntilDelimiterAlloc(alloc, '\n', 1024);
 }
 
 pub fn linenoise(alloc: *Allocator, prompt: []const u8) ![]const u8 {
     const stdin_file = std.io.getStdIn();
     const stdout_file = std.io.getStdOut();
+    const stderr_file = std.io.getStdErr();
 
     if (stdin_file.isTty()) {
         if (isUnsupportedTerm()) {
-            try stdout_file.write(prompt);
+            try stdout_file.writeAll(prompt);
 
             return "";
         } else {
-            return try linenoiseRaw(stdin_file, stdout_file, prompt);
+            return try linenoiseRaw(alloc, stdin_file, stdout_file, stderr_file, prompt);
         }
     } else {
-        return try linenoiseNoTTY(alloc);
+        return try linenoiseNoTTY(alloc, stdin_file);
     }
 }
