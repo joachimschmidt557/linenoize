@@ -17,7 +17,7 @@ pub const LinenoiseState = struct {
     size: usize,
     cols: usize,
     maxrows: usize,
-    history_index: i32,
+    history_index: usize,
 
     // completions: LinenoiseCompletions,
 

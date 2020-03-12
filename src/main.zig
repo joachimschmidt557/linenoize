@@ -5,15 +5,13 @@ const Buffer = std.Buffer;
 const File = std.fs.File;
 
 const termios = @cImport({ @cInclude("termios.h"); });
-
 const ioctl = @cImport({ @cInclude("sys/ioctl.h"); });
 
 const LinenoiseState = @import("state.zig").LinenoiseState;
+const History = @import("history.zig").History;
+const Hint = @import("hints.zig").Hint;
 
 const unsupported_term = [_][]const u8 { "dumb", "cons25", "emacs" };
-
-const CompletionCallback = fn(input: []u8) void;
-const HintsCallback = fn(input: []u8, color: i32, bold: bool) []u8;
 
 const key_null = 0;
 const key_ctrl_a = 1;
@@ -32,7 +30,7 @@ const key_ctrl_p = 16;
 const key_ctrl_t = 20;
 const key_ctrl_u = 21;
 const key_ctrl_w = 23;
-const key_bsc = 27;
+const key_esc = 27;
 const key_backspace = 127;
 
 fn isUnsupportedTerm() bool {
@@ -119,8 +117,6 @@ fn getColumns(in: File, out: File) usize {
     return 80;
 }
 
-pub const LinenoiseCompletions = ArrayList([]const u8);
-
 fn linenoiseEdit(allocator: *Allocator, in: File, out: File, err: File, prompt: []const u8) ![]const u8 {
     var state = LinenoiseState {
         .alloc = allocator,
@@ -173,7 +169,28 @@ fn linenoiseEdit(allocator: *Allocator, in: File, out: File, err: File, prompt: 
             key_ctrl_t => try state.editSwapPrev(),
             key_ctrl_u => try state.editKillLineBackward(),
             key_ctrl_w => try state.editDeletePrevWord(),
-            key_bsc => {},
+            key_esc => {
+                var seq: [3]u8 = undefined;
+                try in.readAll(seq[0..2]);
+                switch (seq[0]) {
+                    '[' => switch (seq[1]) {
+                        '0'...'9' => {},
+                        'A' => {},
+                        'B' => {},
+                        'C' => try state.editMoveRight(),
+                        'D' => try state.editMoveLeft(),
+                        'H' => try state.editMoveHome(),
+                        'F' => try state.editMoveEnd(),
+                        else => {},
+                    },
+                    '0' => switch (seq[1]) {
+                        'H' => try state.editMoveHome(),
+                        'F' => try state.editMoveEnd(),
+                        else => {},
+                    },
+                    else => {}
+                }
+            },
             key_backspace => try state.editBackspace(),
             else => try state.editInsert(c),
         }
