@@ -4,13 +4,9 @@ const ArrayList = std.ArrayList;
 const Buffer = std.Buffer;
 const File = std.fs.File;
 
-const termios = @cImport({
-    @cInclude("termios.h");
-});
+const termios = @cImport({ @cInclude("termios.h"); });
 
-const ioctl = @cImport({
-    @cInclude("sys/ioctl.h");
-});
+const ioctl = @cImport({ @cInclude("sys/ioctl.h"); });
 
 const LinenoiseState = @import("state.zig").LinenoiseState;
 
@@ -82,6 +78,24 @@ fn disableRawMode(fd: File, orig: termios.termios) void {
 
 fn getCursorPosition(in: File, out: File) !usize {
     var buf: [32]u8 = undefined;
+    var in_stream = in.inStream().stream;
+
+    // Tell terminal to report cursor to in
+    try out.writeAll("\x1B[6n");
+
+    // Read answer
+    const answer = (try in_stream.readUntilDelimiterOrEof(&buf, 'R')) orelse
+        return error.NoAnswer;
+
+    // Parse answer
+    if (!std.mem.startsWith(u8, "\x1B[", answer))
+        return error.WrongAnswer;
+
+    var iter = std.mem.separate(answer[2..], ";");
+    const y = iter.next() orelse return error.WrongAnswer;
+    const x = iter.next() orelse return error.WrongAnswer;
+
+    return try std.fmt.parseInt(usize, x, 10);
 }
 
 fn getColumns(in: File, out: File) usize {
@@ -89,6 +103,15 @@ fn getColumns(in: File, out: File) usize {
 
     if (ioctl.ioctl(1, ioctl.TIOCGWINSZ, &ws) == -1 or ws.ws_col == 0) {
         // ioctl() didn't work
+        var out_stream = out.outStream().stream;
+        const orig_cursor_pos = getCursorPosition(in, out) catch return 80;
+
+        out_stream.print("\x1B[999C", .{}) catch return 80;
+        const cols = getCursorPosition(in, out) catch return 80;
+
+        out_stream.print("\x1B[{}D", .{ orig_cursor_pos }) catch return 80;
+
+        return cols;
     } else {
         return ws.ws_col;
     }
@@ -149,7 +172,7 @@ fn linenoiseEdit(allocator: *Allocator, in: File, out: File, err: File, prompt: 
             key_ctrl_p => {},
             key_ctrl_t => try state.editSwapPrev(),
             key_ctrl_u => try state.editKillLineBackward(),
-            key_ctrl_w => {},
+            key_ctrl_w => try state.editDeletePrevWord(),
             key_bsc => {},
             key_backspace => try state.editBackspace(),
             else => try state.editInsert(c),

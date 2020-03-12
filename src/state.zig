@@ -143,7 +143,20 @@ pub const LinenoiseState = struct {
         }
     }
 
-    fn editDeletePrevWord(self: *Self) void {
+    fn editDeletePrevWord(self: *Self) !void {
+        if (self.buf.len() > 0 and self.pos > 0) {
+            const old_pos = self.pos;
+            while (self.pos > 0 and self.buf.span()[self.pos - 1] == ' ')
+                self.pos -= 1;
+            while (self.pos > 0 and self.buf.span()[self.pos - 1] != ' ')
+                self.pos -= 1;
+
+            const diff = old_pos - self.pos;
+            const new_len = self.buf.len() - diff;
+            std.mem.copy(u8, self.buf.span()[self.pos..new_len], self.buf.span()[old_pos..]);
+            try self.buf.resize(new_len);
+            try self.refreshLine();
+        }
     }
 
     fn editKillLineForward(self: *Self) !void {
