@@ -8,8 +8,8 @@ const termios = @cImport({ @cInclude("termios.h"); });
 const ioctl = @cImport({ @cInclude("sys/ioctl.h"); });
 
 const LinenoiseState = @import("state.zig").LinenoiseState;
-const History = @import("history.zig").History;
-const Hint = @import("hints.zig").Hint;
+pub const History = @import("history.zig").History;
+pub const HintsCallback = (fn (line: []const u8) ?[]const u8);
 
 const unsupported_term = [_][]const u8 { "dumb", "cons25", "emacs" };
 
@@ -215,6 +215,7 @@ fn linenoiseNoTTY(alloc: *Allocator, stdin: File) ![]const u8 {
 pub const Linenoise = struct {
     alloc: *Allocator,
     history: History,
+    hints_callback: ?HintsCallback,
 
     const Self = @This();
 
@@ -222,6 +223,7 @@ pub const Linenoise = struct {
         return Self{
             .alloc = alloc,
             .history = History.empty(alloc),
+            .hints_callback = null,
         };
     }
 

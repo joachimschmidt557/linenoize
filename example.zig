@@ -6,8 +6,12 @@ fn completion(buf: []const u8) void {
 
 }
 
-fn hints(buf: []const u8) ?Hint {
-
+fn hints(buf: []const u8) ?[]const u8 {
+    if (std.mem.eql(u8, "hello", buf)) {
+        return " World";
+    } else {
+        return null;
+    }
 }
 
 pub fn main() !void {
@@ -17,6 +21,9 @@ pub fn main() !void {
 
     var ln = Linenoise.init(allocator);
     defer ln.deinit();
+
+    // Set up hints callback
+    ln.hints_callback = hints;
 
     while (try ln.linenoise("hello> ")) |input| {
         std.debug.warn("input: {}\n", .{ input });

@@ -40,7 +40,12 @@ pub const LinenoiseState = struct {
         }
     }
 
-    fn refreshShowHints(self: *Self, buf: Buffer) void {
+    fn refreshShowHints(self: *Self, buf: *Buffer) !void {
+        if (self.ln.hints_callback) |fun| {
+            if (fun(self.buf.toSlice())) |hint| {
+                try buf.append(hint);
+            }
+        }
     }
 
     fn refreshSingleLine(self: *Self) !void {
@@ -57,7 +62,7 @@ pub const LinenoiseState = struct {
         try buf.append(self.buf.toSlice());
 
         // Show hints
-        self.refreshShowHints(buf);
+        try self.refreshShowHints(&buf);
 
         // Erase to the right
         try buf.append("\x1b[0K");

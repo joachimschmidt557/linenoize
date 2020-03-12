@@ -6,6 +6,6 @@ A not 100%-accurate port of [linenoise](https://github.com/antirez/linenoise) to
 
 - [x] Line editing
 - [ ] Completions
-- [ ] Hints
+- [x] Hints
 - [ ] History
 - [ ] Multi line mode
