@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const linenoise = @import("src/main.zig");
+const Linenoise = @import("src/main.zig").Linenoise;
 
 fn completion(buf: []const u8) void {
 
@@ -11,10 +11,14 @@ fn hints(buf: []const u8) ?Hint {
 }
 
 pub fn main() !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.direct_allocator);
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = &arena.allocator;
 
-    const res = try linenoise.linenoise(allocator, "hello> ");
-    std.debug.warn("input: {}\n", .{ res });
+    var ln = Linenoise.init(allocator);
+    defer ln.deinit();
+
+    while (try ln.linenoise("hello> ")) |input| {
+        std.debug.warn("input: {}\n", .{ input });
+    }
 }

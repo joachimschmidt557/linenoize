@@ -4,12 +4,15 @@ const ArrayList = std.ArrayList;
 const Buffer = std.Buffer;
 const File = std.fs.File;
 
+const Linenoise = @import("main.zig").Linenoise;
+const History = @import("history.zig").History;
+
 pub const LinenoiseState = struct {
     alloc: *Allocator,
+    ln: *Linenoise,
 
     stdin: File,
     stdout: File,
-    stderr: File,
     buf: Buffer,
     prompt: []const u8,
     pos: usize,
@@ -17,13 +20,7 @@ pub const LinenoiseState = struct {
     size: usize,
     cols: usize,
     maxrows: usize,
-    history_index: usize,
 
-    // completions: LinenoiseCompletions,
-
-    // history: [][]u8,
-
-    // rawmode: bool,
     mlmode: bool,
 
     const Self = @This();
@@ -116,6 +113,12 @@ pub const LinenoiseState = struct {
         if (self.pos < self.buf.len()) {
             self.pos = self.buf.len();
             try self.refreshLine();
+        }
+    }
+
+    fn editHistoryNext(self: *Self) !void {
+        if (self.ln.history.hist.len > 0) {
+            
         }
     }
 

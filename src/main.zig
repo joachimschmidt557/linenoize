@@ -83,15 +83,15 @@ fn getCursorPosition(in: File, out: File) !usize {
 
     // Read answer
     const answer = (try in_stream.readUntilDelimiterOrEof(&buf, 'R')) orelse
-        return error.NoAnswer;
+        return error.CursorPos;
 
     // Parse answer
     if (!std.mem.startsWith(u8, "\x1B[", answer))
-        return error.WrongAnswer;
+        return error.CursorPos;
 
     var iter = std.mem.separate(answer[2..], ";");
-    const y = iter.next() orelse return error.WrongAnswer;
-    const x = iter.next() orelse return error.WrongAnswer;
+    const y = iter.next() orelse return error.CursorPos;
+    const x = iter.next() orelse return error.CursorPos;
 
     return try std.fmt.parseInt(usize, x, 10);
 }
@@ -117,28 +117,28 @@ fn getColumns(in: File, out: File) usize {
     return 80;
 }
 
-fn linenoiseEdit(allocator: *Allocator, in: File, out: File, err: File, prompt: []const u8) ![]const u8 {
+fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
     var state = LinenoiseState {
-        .alloc = allocator,
+        .alloc = ln.alloc,
+        .ln = ln,
 
         .stdin = in,
         .stdout = out,
-        .stderr = err,
         .prompt = prompt,
 
-        .buf = try Buffer.initSize(allocator, 0),
+        .buf = try Buffer.initSize(ln.alloc, 0),
 
         .pos = 0,
         .oldpos = 0,
         .size = 0,
         .cols = getColumns(in, out),
         .maxrows = 0,
-        .history_index = 0,
 
         .mlmode = false,
     };
 
-    try out.writeAll(prompt);
+    try state.ln.history.add("");
+    try state.stdout.writeAll(prompt);
 
     while (true) {
         var input_buf: [1]u8 = undefined;
@@ -149,12 +149,12 @@ fn linenoiseEdit(allocator: *Allocator, in: File, out: File, err: File, prompt: 
             key_null => {},
             key_ctrl_a => try state.editMoveHome(),
             key_ctrl_b => try state.editMoveLeft(),
-            key_ctrl_c => {},
+            key_ctrl_c => return error.CtrlC,
             key_ctrl_d => {
                 if (state.buf.len() > 0) {
                     try state.editDelete();
                 } else {
-                    return "";
+                    return null;
                 }
             },
             key_ctrl_e => try state.editMoveEnd(),
@@ -164,7 +164,7 @@ fn linenoiseEdit(allocator: *Allocator, in: File, out: File, err: File, prompt: 
             key_ctrl_k => try state.editKillLineForward(),
             key_ctrl_l => try state.clearScreen(),
             key_enter => return state.buf.span(),
-            key_ctrl_n => {},
+            key_ctrl_n => try state.editHistoryNext(),
             key_ctrl_p => {},
             key_ctrl_t => try state.editSwapPrev(),
             key_ctrl_u => try state.editKillLineBackward(),
@@ -197,34 +197,51 @@ fn linenoiseEdit(allocator: *Allocator, in: File, out: File, err: File, prompt: 
     }
 }
 
-fn linenoiseRaw(allocator: *Allocator, in: File, out: File, err: File, prompt: []const u8) ![]const u8 {
+fn linenoiseRaw(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
     const orig = try enableRawMode(in);
-    const result = try linenoiseEdit(allocator, in, out, err, prompt);
+    const result = try linenoiseEdit(ln, in, out, prompt);
     disableRawMode(in, orig);
 
     try out.writeAll("\n");
     return result;
 }
 
+/// Read a line with no special features (no hints, no completions, no history)
 fn linenoiseNoTTY(alloc: *Allocator, stdin: File) ![]const u8 {
     var stream = stdin.inStream().stream;
-    return try stream.readUntilDelimiterAlloc(alloc, '\n', 1024);
+    return try stream.readUntilDelimiterAlloc(alloc, '\n', std.math.maxInt(usize));
 }
 
-pub fn linenoise(alloc: *Allocator, prompt: []const u8) ![]const u8 {
-    const stdin_file = std.io.getStdIn();
-    const stdout_file = std.io.getStdOut();
-    const stderr_file = std.io.getStdErr();
+pub const Linenoise = struct {
+    alloc: *Allocator,
+    history: History,
 
-    if (stdin_file.isTty()) {
-        if (isUnsupportedTerm()) {
-            try stdout_file.writeAll(prompt);
+    const Self = @This();
 
-            return "";
-        } else {
-            return try linenoiseRaw(alloc, stdin_file, stdout_file, stderr_file, prompt);
-        }
-    } else {
-        return try linenoiseNoTTY(alloc, stdin_file);
+    pub fn init(alloc: *Allocator) Self {
+        return Self{
+            .alloc = alloc,
+            .history = History.empty(alloc),
+        };
     }
-}
+
+    pub fn deinit(self: *Self) void {
+        self.history.deinit();
+    }
+
+    pub fn linenoise(self: *Self, prompt: []const u8) !?[]const u8 {
+        const stdin_file = std.io.getStdIn();
+        const stdout_file = std.io.getStdOut();
+
+        if (stdin_file.isTty()) {
+            if (isUnsupportedTerm()) {
+                try stdout_file.writeAll(prompt);
+                return try linenoiseNoTTY(self.alloc, stdin_file);
+            } else {
+                return try linenoiseRaw(self, stdin_file, stdout_file, prompt);
+            }
+        } else {
+            return try linenoiseNoTTY(self.alloc, stdin_file);
+        }
+    }
+};
