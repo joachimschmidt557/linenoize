@@ -9,7 +9,7 @@ const ioctl = @cImport({ @cInclude("sys/ioctl.h"); });
 
 const LinenoiseState = @import("state.zig").LinenoiseState;
 pub const History = @import("history.zig").History;
-pub const HintsCallback = (fn (line: []const u8) ?[]const u8);
+pub const HintsCallback = (fn (alloc: *Allocator, line: []const u8) Allocator.Error!?[]const u8);
 
 const unsupported_term = [_][]const u8 { "dumb", "cons25", "emacs" };
 
@@ -154,6 +154,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
                 if (state.buf.len() > 0) {
                     try state.editDelete();
                 } else {
+                    state.ln.history.pop();
                     return null;
                 }
             },
@@ -199,6 +200,8 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
     }
 }
 
+/// Read a line with custom line editing mechanics. This includes hints,
+/// completions and history
 fn linenoiseRaw(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
     const orig = try enableRawMode(in);
     const result = try linenoiseEdit(ln, in, out, prompt);
@@ -209,9 +212,12 @@ fn linenoiseRaw(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]con
 }
 
 /// Read a line with no special features (no hints, no completions, no history)
-fn linenoiseNoTTY(alloc: *Allocator, stdin: File) ![]const u8 {
+fn linenoiseNoTTY(alloc: *Allocator, stdin: File) !?[]const u8 {
     var stream = stdin.inStream().stream;
-    return try stream.readUntilDelimiterAlloc(alloc, '\n', std.math.maxInt(usize));
+    return stream.readUntilDelimiterAlloc(alloc, '\n', std.math.maxInt(usize)) catch |e| switch (e) {
+        error.EndOfStream => return null,
+        else => return e,
+    };
 }
 
 pub const Linenoise = struct {
@@ -221,6 +227,7 @@ pub const Linenoise = struct {
 
     const Self = @This();
 
+    /// Initialize a linenoise struct
     pub fn init(alloc: *Allocator) Self {
         return Self{
             .alloc = alloc,
@@ -229,10 +236,12 @@ pub const Linenoise = struct {
         };
     }
 
+    /// Free all resources occupied by this struct
     pub fn deinit(self: *Self) void {
         self.history.deinit();
     }
 
+    /// Reads a line from the terminal. Caller owns returned memory
     pub fn linenoise(self: *Self, prompt: []const u8) !?[]const u8 {
         const stdin_file = std.io.getStdIn();
         const stdout_file = std.io.getStdOut();

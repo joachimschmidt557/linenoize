@@ -55,8 +55,8 @@ pub const History = struct {
     }
 
     /// Saves the history to a file
-    pub fn save(path: []const u8) !void {
-        const file = try std.fs.File.openWrite(path);
+    pub fn save(self: *Self, path: []const u8) !void {
+        const file = try std.fs.cwd().createFile(path, .{});
         defer file.close();
 
         for (self.hist.toSlice()) |line| {

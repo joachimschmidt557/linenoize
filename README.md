@@ -7,5 +7,5 @@ A not 100%-accurate port of [linenoise](https://github.com/antirez/linenoise) to
 - [x] Line editing
 - [ ] Completions
 - [x] Hints
-- [ ] History
+- [x] History
 - [ ] Multi line mode

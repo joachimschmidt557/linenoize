@@ -42,8 +42,10 @@ pub const LinenoiseState = struct {
 
     fn refreshShowHints(self: *Self, buf: *Buffer) !void {
         if (self.ln.hints_callback) |fun| {
-            if (fun(self.buf.toSlice())) |hint| {
-                try buf.append(hint);
+            const hint = try fun(self.alloc, self.buf.toSlice());
+            if (hint) |str| {
+                defer self.alloc.free(str);
+                try buf.append(str);
             }
         }
     }
