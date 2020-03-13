@@ -113,8 +113,6 @@ fn getColumns(in: File, out: File) usize {
     } else {
         return ws.ws_col;
     }
-
-    return 80;
 }
 
 fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
@@ -136,8 +134,10 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
 
         .mlmode = false,
     };
+    defer state.buf.deinit();
 
     try state.ln.history.add("");
+    state.ln.history.current = state.ln.history.hist.len - 1;
     try state.stdout.writeAll(prompt);
 
     while (true) {
@@ -159,13 +159,15 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
             },
             key_ctrl_e => try state.editMoveEnd(),
             key_ctrl_f => try state.editMoveRight(),
-            key_ctrl_h => {},
             key_tab => {},
             key_ctrl_k => try state.editKillLineForward(),
             key_ctrl_l => try state.clearScreen(),
-            key_enter => return state.buf.span(),
-            key_ctrl_n => try state.editHistoryNext(),
-            key_ctrl_p => {},
+            key_enter => {
+                state.ln.history.pop();
+                return try std.mem.dupe(state.alloc, u8, state.buf.span());
+            },
+            key_ctrl_n => try state.editHistoryNext(.Next),
+            key_ctrl_p => try state.editHistoryNext(.Prev),
             key_ctrl_t => try state.editSwapPrev(),
             key_ctrl_u => try state.editKillLineBackward(),
             key_ctrl_w => try state.editDeletePrevWord(),
@@ -191,7 +193,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
                     else => {}
                 }
             },
-            key_backspace => try state.editBackspace(),
+            key_backspace, key_ctrl_h => try state.editBackspace(),
             else => try state.editInsert(c),
         }
     }

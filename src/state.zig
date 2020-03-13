@@ -121,9 +121,31 @@ pub const LinenoiseState = struct {
         }
     }
 
-    fn editHistoryNext(self: *Self) !void {
+    pub const HistoryDirection = enum {
+        Next,
+        Prev,
+    };
+
+    fn editHistoryNext(self: *Self, dir: HistoryDirection) !void {
         if (self.ln.history.hist.len > 0) {
-            
+            // Update the current history with the current line
+            const old_index = self.ln.history.current;
+            const current_entry = self.ln.history.hist.toSlice()[old_index];
+            self.ln.history.alloc.free(current_entry);
+            self.ln.history.hist.toSlice()[old_index] = try std.mem.dupe(self.ln.history.alloc, u8, self.buf.span());
+
+            // Update history index
+            const new_index = switch(dir) {
+                .Next => if (old_index < self.ln.history.hist.len - 1) old_index + 1 else self.ln.history.hist.len - 1,
+                .Prev => if (old_index > 0) old_index - 1 else 0,
+            };
+            self.ln.history.current = new_index;
+
+            // Copy history entry to the current line buffer
+            try self.buf.replaceContents(self.ln.history.hist.toSlice()[new_index]);
+            self.pos = self.buf.len();
+
+            try self.refreshLine();
         }
     }
 

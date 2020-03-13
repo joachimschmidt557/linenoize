@@ -27,9 +27,13 @@ pub const History = struct {
     /// Adds this line to the history. Does not take ownership of the line, but
     /// instead copies it
     pub fn add(self: *Self, line: []const u8) !void {
-        if (self.hist.len > 0 and !std.mem.eql(u8, line, self.hist.toSlice()[self.hist.len])) {
+        if (self.hist.len < 1 or !std.mem.eql(u8, line, self.hist.toSlice()[self.hist.len - 1])) {
             try self.hist.append(try std.mem.dupe(self.alloc, u8, line));
         }
+    }
+
+    pub fn pop(self: *Self) void {
+        self.alloc.free(self.hist.pop());
     }
 
     /// Loads the history from a file

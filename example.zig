@@ -17,7 +17,8 @@ fn hints(buf: []const u8) ?[]const u8 {
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    const allocator = &arena.allocator;
+    // const allocator = &arena.allocator;
+    const allocator = std.heap.c_allocator;
 
     var ln = Linenoise.init(allocator);
     defer ln.deinit();
@@ -26,6 +27,8 @@ pub fn main() !void {
     ln.hints_callback = hints;
 
     while (try ln.linenoise("hello> ")) |input| {
+        defer allocator.free(input);
         std.debug.warn("input: {}\n", .{ input });
+        try ln.history.add(input);
     }
 }
