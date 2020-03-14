@@ -7,6 +7,9 @@ const File = std.fs.File;
 const Linenoise = @import("main.zig").Linenoise;
 const History = @import("history.zig").History;
 
+const key_tab = 9;
+const key_esc = 27;
+
 pub const LinenoiseState = struct {
     alloc: *Allocator,
     ln: *Linenoise,
@@ -30,14 +33,84 @@ pub const LinenoiseState = struct {
         try self.refreshLine();
     }
 
-    pub fn beep(self: *Self) void {
-        try self.stderr.writeAll("\x07");
+    pub fn beep(self: *Self) !void {
+        const stderr = std.io.getStdErr();
+        try stderr.writeAll("\x07");
     }
 
-    pub fn completeLine(self: *Self) void {
-        if (self.completions.len == 0) {
-            self.beep();
+    pub fn browseCompletions(self: *Self) !?u8 {
+        var input_buf: [1]u8 = undefined;
+        var c: ?u8 = null;
+
+        const fun = self.ln.completions_callback orelse return null;
+        const completions = try fun(self.alloc, self.buf.toSlice());
+        defer {
+            for (completions) |x| self.alloc.free(x);
+            self.alloc.free(completions);
         }
+
+        if (completions.len == 0) {
+            try self.beep();
+        } else {
+            var finished = false;
+            var i: usize = 0;
+
+            while (!finished) {
+                if (i < completions.len) {
+                    // Change to completion nr. i
+                    // First, save buffer so we can restore it later
+                    const old_buf_alloc = self.buf.list.allocator;
+                    const old_buf = self.buf.toOwnedSlice();
+                    const old_pos = self.pos;
+
+                    // Show suggested completion
+                    try self.buf.replaceContents(completions[i]);
+                    self.pos = self.buf.len();
+                    try self.refreshLine();
+
+                    // Restore original buffer into state
+                    self.buf.deinit();
+                    self.buf = try Buffer.fromOwnedSlice(old_buf_alloc, old_buf);
+                    self.pos = old_pos;
+                } else {
+                    // Return to original line
+                    try self.refreshLine();
+                }
+
+                // Read next key
+                const nread = try self.stdin.read(&input_buf);
+                c = if (nread == 1) input_buf[0] else return error.NothingRead;
+
+                switch (c.?) {
+                    key_tab => {
+                        // Next completion
+                        i = (i + 1) % (completions.len + 1);
+                        if (i == completions.len) try self.beep();
+                    },
+                    key_esc => {
+                        // Stop browsing completions, return to buffer displayed
+                        // prior to browsing completions
+                        if (i < completions.len) try self.refreshLine();
+                        finished = true;
+                    },
+                    else => {
+                        // Stop browsing completions, potentially use suggested
+                        // completion
+                        if (i < completions.len) {
+                            // Replace buffer with text in the selected
+                            // completion
+                            const old_buf_alloc = self.buf.list.allocator;
+                            self.buf.deinit();
+                            self.buf = try Buffer.init(old_buf_alloc, completions[i]);
+                            self.pos = self.buf.len();
+                        }
+                        finished = true;
+                    },
+                }
+            }
+        }
+
+        return c;
     }
 
     fn refreshShowHints(self: *Self, buf: *Buffer) !void {

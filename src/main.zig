@@ -10,6 +10,7 @@ const ioctl = @cImport({ @cInclude("sys/ioctl.h"); });
 const LinenoiseState = @import("state.zig").LinenoiseState;
 pub const History = @import("history.zig").History;
 pub const HintsCallback = (fn (alloc: *Allocator, line: []const u8) Allocator.Error!?[]const u8);
+pub const CompletionsCallback = (fn (alloc: *Allocator, line: []const u8) Allocator.Error![][]const u8);
 
 const unsupported_term = [_][]const u8 { "dumb", "cons25", "emacs" };
 
@@ -143,7 +144,14 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
     while (true) {
         var input_buf: [1]u8 = undefined;
         const nread = try in.read(&input_buf);
-        const c = if (nread == 1) input_buf[0] else return "";
+        var c = if (nread == 1) input_buf[0] else return null;
+
+        // Browse completions before editing
+        if (c == key_tab) {
+            if (try state.browseCompletions()) |new_c| {
+                c = new_c;
+            }
+        }
 
         switch (c) {
             key_null => {},
@@ -224,6 +232,7 @@ pub const Linenoise = struct {
     alloc: *Allocator,
     history: History,
     hints_callback: ?HintsCallback,
+    completions_callback: ?CompletionsCallback,
 
     const Self = @This();
 
@@ -233,6 +242,7 @@ pub const Linenoise = struct {
             .alloc = alloc,
             .history = History.empty(alloc),
             .hints_callback = null,
+            .completions_callback = null,
         };
     }
 
