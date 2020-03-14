@@ -42,6 +42,9 @@ pub fn main() !void {
     // Set up completions callback
     ln.completions_callback = completion;
 
+    // Enable mask mode
+    // ln.mask_mode = true;
+
     while (try ln.linenoise("hello> ")) |input| {
         defer allocator.free(input);
         std.debug.warn("input: {}\n", .{input});

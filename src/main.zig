@@ -124,16 +124,12 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
         .stdin = in,
         .stdout = out,
         .prompt = prompt,
-
         .buf = try Buffer.initSize(ln.alloc, 0),
-
         .pos = 0,
         .oldpos = 0,
         .size = 0,
         .cols = getColumns(in, out),
         .maxrows = 0,
-
-        .mlmode = false,
     };
     defer state.buf.deinit();
 
@@ -231,6 +227,8 @@ fn linenoiseNoTTY(alloc: *Allocator, stdin: File) !?[]const u8 {
 pub const Linenoise = struct {
     alloc: *Allocator,
     history: History,
+    multiline_mode: bool,
+    mask_mode: bool,
     hints_callback: ?HintsCallback,
     completions_callback: ?CompletionsCallback,
 
@@ -241,6 +239,8 @@ pub const Linenoise = struct {
         return Self{
             .alloc = alloc,
             .history = History.empty(alloc),
+            .mask_mode = false,
+            .multiline_mode = false,
             .hints_callback = null,
             .completions_callback = null,
         };

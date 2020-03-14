@@ -24,8 +24,6 @@ pub const LinenoiseState = struct {
     cols: usize,
     maxrows: usize,
 
-    mlmode: bool,
-
     const Self = @This();
 
     pub fn clearScreen(self: *Self) !void {
@@ -134,7 +132,13 @@ pub const LinenoiseState = struct {
         try buf.append(self.prompt);
 
         // Write current buffer content
-        try buf.append(self.buf.toSlice());
+        if (self.ln.mask_mode) {
+            for (self.buf.toSlice()) |_| {
+                try buf.appendByte('*');
+            }
+        } else {
+            try buf.append(self.buf.toSlice());
+        }
 
         // Show hints
         try self.refreshShowHints(&buf);
@@ -153,7 +157,7 @@ pub const LinenoiseState = struct {
     }
 
     pub fn refreshLine(self: *Self) !void {
-        if (self.mlmode) {
+        if (self.ln.multiline_mode) {
             self.refreshMultiLine();
         } else {
             try self.refreshSingleLine();

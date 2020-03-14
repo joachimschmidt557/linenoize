@@ -1,11 +1,13 @@
 # zig-linenoise
 
-A not 100%-accurate port of [linenoise](https://github.com/antirez/linenoise) to zig.
+A not 100%-accurate port of [linenoise](https://github.com/antirez/linenoise) to
+zig. It currently relies on libc for `termios` and `ioctl`.
 
 ## ToDo
 
 - [x] Line editing
-- [ ] Completions
+- [x] Completions
 - [x] Hints
 - [x] History
 - [ ] Multi line mode
+- [ ] Mask input mode
