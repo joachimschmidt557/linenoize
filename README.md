@@ -10,4 +10,4 @@ zig. It currently relies on libc for `termios` and `ioctl`.
 - [x] Hints
 - [x] History
 - [ ] Multi line mode
-- [ ] Mask input mode
+- [x] Mask input mode

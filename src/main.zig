@@ -77,7 +77,7 @@ fn disableRawMode(fd: File, orig: termios.termios) void {
 
 fn getCursorPosition(in: File, out: File) !usize {
     var buf: [32]u8 = undefined;
-    var in_stream = in.inStream().stream;
+    var in_stream = in.inStream();
 
     // Tell terminal to report cursor to in
     try out.writeAll("\x1B[6n");
@@ -102,7 +102,7 @@ fn getColumns(in: File, out: File) usize {
 
     if (ioctl.ioctl(1, ioctl.TIOCGWINSZ, &ws) == -1 or ws.ws_col == 0) {
         // ioctl() didn't work
-        var out_stream = out.outStream().stream;
+        var out_stream = out.outStream();
         const orig_cursor_pos = getCursorPosition(in, out) catch return 80;
 
         out_stream.print("\x1B[999C", .{}) catch return 80;
@@ -164,7 +164,6 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
             },
             key_ctrl_e => try state.editMoveEnd(),
             key_ctrl_f => try state.editMoveRight(),
-            key_tab => {},
             key_ctrl_k => try state.editKillLineForward(),
             key_ctrl_l => try state.clearScreen(),
             key_enter => {
@@ -177,13 +176,17 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
             key_ctrl_u => try state.editKillLineBackward(),
             key_ctrl_w => try state.editDeletePrevWord(),
             key_esc => {
-                var seq: [3]u8 = undefined;
-                try in.readAll(seq[0..2]);
+                var seq: [2]u8 = undefined;
+                _ = try in.readAll(&seq);
                 switch (seq[0]) {
                     '[' => switch (seq[1]) {
-                        '0'...'9' => {},
-                        'A' => {},
-                        'B' => {},
+                        '0'...'9' => {
+                            _ = try in.readAll(&input_buf);
+                            if (seq[1] == '3' and input_buf[0] == '~')
+                                try state.editDelete();
+                        },
+                        'A' => try state.editHistoryNext(.Prev),
+                        'B' => try state.editHistoryNext(.Next),
                         'C' => try state.editMoveRight(),
                         'D' => try state.editMoveLeft(),
                         'H' => try state.editMoveHome(),
@@ -217,7 +220,7 @@ fn linenoiseRaw(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]con
 
 /// Read a line with no special features (no hints, no completions, no history)
 fn linenoiseNoTTY(alloc: *Allocator, stdin: File) !?[]const u8 {
-    var stream = stdin.inStream().stream;
+    var stream = stdin.inStream();
     return stream.readUntilDelimiterAlloc(alloc, '\n', std.math.maxInt(usize)) catch |e| switch (e) {
         error.EndOfStream => return null,
         else => return e,

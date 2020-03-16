@@ -147,7 +147,7 @@ pub const LinenoiseState = struct {
         try buf.append("\x1b[0K");
 
         // Move cursor to original position
-        try buf.print("\r\x1b[{}C", .{self.pos + self.prompt.len});
+        try buf.outStream().print("\r\x1b[{}C", .{self.pos + self.prompt.len});
 
         // Write buffer
         try self.stdin.writeAll(buf.toSliceConst());

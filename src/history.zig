@@ -43,7 +43,7 @@ pub const History = struct {
 
         const max_line_len = std.mem.page_size;
 
-        const stream = &file.inStream().stream;
+        var stream = file.inStream();
         while (stream.readUntilDelimiterAlloc(self.alloc, '\n', max_line_len)) |line| {
             try self.hist.append(line);
         } else |err| {
