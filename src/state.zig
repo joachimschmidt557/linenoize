@@ -19,10 +19,10 @@ pub const LinenoiseState = struct {
     buf: Buffer,
     prompt: []const u8,
     pos: usize,
-    oldpos: usize,
+    old_pos: usize,
     size: usize,
     cols: usize,
-    maxrows: usize,
+    max_rows: usize,
 
     const Self = @This();
 
@@ -125,19 +125,26 @@ pub const LinenoiseState = struct {
         var buf = try Buffer.initSize(self.alloc, 0);
         defer buf.deinit();
 
+        // Trim buffer if it is too long
+        const avail_space = self.cols - self.prompt.len;
+        const start = if (self.pos > avail_space) self.pos - avail_space else 0;
+        const end = if (start + avail_space < self.buf.len()) start + avail_space else self.buf.len();
+        const trimmed_buf = self.buf.toSlice()[start..end];
+
         // Move cursor to left edge
         try buf.appendByte('\r');
 
         // Write prompt
         try buf.append(self.prompt);
+        // try buf.outStream().print("{}", .{ self.cols });
 
         // Write current buffer content
         if (self.ln.mask_mode) {
-            for (self.buf.toSlice()) |_| {
+            for (trimmed_buf) |_| {
                 try buf.appendByte('*');
             }
         } else {
-            try buf.append(self.buf.toSlice());
+            try buf.append(trimmed_buf);
         }
 
         // Show hints
@@ -150,15 +157,22 @@ pub const LinenoiseState = struct {
         try buf.outStream().print("\r\x1b[{}C", .{self.pos + self.prompt.len});
 
         // Write buffer
-        try self.stdin.writeAll(buf.toSliceConst());
+        try self.stdout.writeAll(buf.span());
     }
 
-    fn refreshMultiLine(self: *Self) void {
+    fn refreshMultiLine(self: *Self) !void {
+        var buf = try Buffer.initSize(self.alloc, 0);
+        defer buf.deinit();
+
+        const rows = (self.prompt.len + self.buf.len() + self.cols - 1) / self.cols;
+        const rpos = (self.prompt.len + self.old_pos + self.cols) / self.cols;
+
+        try self.stdout.writeAll(buf.span());
     }
 
     pub fn refreshLine(self: *Self) !void {
         if (self.ln.multiline_mode) {
-            self.refreshMultiLine();
+            try self.refreshMultiLine();
         } else {
             try self.refreshSingleLine();
         }

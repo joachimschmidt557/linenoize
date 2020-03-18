@@ -126,10 +126,10 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
         .prompt = prompt,
         .buf = try Buffer.initSize(ln.alloc, 0),
         .pos = 0,
-        .oldpos = 0,
+        .old_pos = 0,
         .size = 0,
         .cols = getColumns(in, out),
-        .maxrows = 0,
+        .max_rows = 0,
     };
     defer state.buf.deinit();
 
