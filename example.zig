@@ -24,9 +24,6 @@ fn hints(alloc: *Allocator, buf: []const u8) !?[]const u8 {
 }
 
 pub fn main() !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    // const allocator = &arena.allocator;
     const allocator = std.heap.c_allocator;
 
     var ln = Linenoise.init(allocator);
@@ -44,6 +41,9 @@ pub fn main() !void {
 
     // Enable mask mode
     // ln.mask_mode = true;
+
+    // Enable multiline mode
+    // ln.multiline_mode = true;
 
     while (try ln.linenoise("hello> ")) |input| {
         defer allocator.free(input);

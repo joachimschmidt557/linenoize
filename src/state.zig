@@ -41,7 +41,7 @@ pub const LinenoiseState = struct {
         var c: ?u8 = null;
 
         const fun = self.ln.completions_callback orelse return null;
-        const completions = try fun(self.alloc, self.buf.toSlice());
+        const completions = try fun(self.alloc, self.buf.span());
         defer {
             for (completions) |x| self.alloc.free(x);
             self.alloc.free(completions);
@@ -113,7 +113,7 @@ pub const LinenoiseState = struct {
 
     fn refreshShowHints(self: *Self, buf: *Buffer) !void {
         if (self.ln.hints_callback) |fun| {
-            const hint = try fun(self.alloc, self.buf.toSlice());
+            const hint = try fun(self.alloc, self.buf.span());
             if (hint) |str| {
                 defer self.alloc.free(str);
                 try buf.append(str);
@@ -129,14 +129,13 @@ pub const LinenoiseState = struct {
         const avail_space = self.cols - self.prompt.len;
         const start = if (self.pos > avail_space) self.pos - avail_space else 0;
         const end = if (start + avail_space < self.buf.len()) start + avail_space else self.buf.len();
-        const trimmed_buf = self.buf.toSlice()[start..end];
+        const trimmed_buf = self.buf.span()[start..end];
 
         // Move cursor to left edge
         try buf.appendByte('\r');
 
         // Write prompt
         try buf.append(self.prompt);
-        // try buf.outStream().print("{}", .{ self.cols });
 
         // Write current buffer content
         if (self.ln.mask_mode) {
@@ -164,8 +163,68 @@ pub const LinenoiseState = struct {
         var buf = try Buffer.initSize(self.alloc, 0);
         defer buf.deinit();
 
-        const rows = (self.prompt.len + self.buf.len() + self.cols - 1) / self.cols;
-        const rpos = (self.prompt.len + self.old_pos + self.cols) / self.cols;
+        var rows = (self.prompt.len + self.buf.len() + self.cols - 1) / self.cols;
+        var rpos = (self.prompt.len + self.old_pos + self.cols) / self.cols;
+        const old_rows = self.max_rows;
+
+        if (rows > self.max_rows) {
+            self.max_rows = rows;
+        }
+
+        // Go to the last row
+        if (old_rows > rpos) {
+            try buf.outStream().print("\x1B[{}B", .{ old_rows - rpos });
+        }
+
+        // Clear every row
+        if (old_rows > 0) {
+            var j: usize = 0;
+            while (j < old_rows - 1) : (j += 1) {
+                try buf.append("\r\x1B[0K\x1B[1A");
+            }
+        }
+
+        // Clear the top line
+        try buf.append("\r\x1B[0K");
+
+        // Write prompt
+        try buf.append(self.prompt);
+
+        // Write current buffer content
+        if (self.ln.mask_mode) {
+            for (self.buf.span()) |_| {
+                try buf.appendByte('*');
+            }
+        } else {
+            try buf.append(self.buf.span());
+        }
+
+        // Reserve a newline if we filled all columns
+        if (self.pos > 0 and self.pos == self.buf.len() and (self.pos + self.prompt.len) % self.cols == 0) {
+            try buf.append("\n\r");
+            rows += 1;
+            if (rows > self.max_rows) {
+                self.max_rows = rows;
+            }
+        }
+
+        // Move cursor to right position:
+        const rpos2 = (self.prompt.len + self.pos + self.cols) / self.cols;
+
+        // First, y position
+        if (rows > rpos2) {
+            try buf.outStream().print("\x1B[{}A", .{ rows - rpos2 });
+        }
+
+        // Then, x position
+        const col = (self.prompt.len + self.pos) % self.cols;
+        if (col > 0) {
+            try buf.outStream().print("\r\x1B[{}C", .{ col });
+        } else {
+            try buf.append("\r");
+        }
+
+        self.old_pos = self.pos;
 
         try self.stdout.writeAll(buf.span());
     }
