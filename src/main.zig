@@ -1,7 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const ArrayList = std.ArrayList;
-const Buffer = std.Buffer;
+const Buffer = std.ArrayList(u8);
 const File = std.fs.File;
 
 const termios = @cImport({ @cInclude("termios.h"); });
@@ -124,7 +123,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
         .stdin = in,
         .stdout = out,
         .prompt = prompt,
-        .buf = try Buffer.initSize(ln.alloc, 0),
+        .buf = Buffer.init(ln.alloc),
         .pos = 0,
         .old_pos = 0,
         .size = 0,
@@ -155,7 +154,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
             key_ctrl_b => try state.editMoveLeft(),
             key_ctrl_c => return error.CtrlC,
             key_ctrl_d => {
-                if (state.buf.len() > 0) {
+                if (state.buf.len > 0) {
                     try state.editDelete();
                 } else {
                     state.ln.history.pop();

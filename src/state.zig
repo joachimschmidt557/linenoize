@@ -1,7 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
-const Buffer = std.Buffer;
+const Buffer = std.ArrayList(u8);
 const File = std.fs.File;
 
 const Linenoise = @import("main.zig").Linenoise;
@@ -57,18 +57,20 @@ pub const LinenoiseState = struct {
                 if (i < completions.len) {
                     // Change to completion nr. i
                     // First, save buffer so we can restore it later
-                    const old_buf_alloc = self.buf.list.allocator;
+                    const old_buf_alloc = self.buf.allocator;
                     const old_buf = self.buf.toOwnedSlice();
                     const old_pos = self.pos;
 
                     // Show suggested completion
-                    try self.buf.replaceContents(completions[i]);
-                    self.pos = self.buf.len();
+                    self.buf.deinit();
+                    self.buf = Buffer.init(old_buf_alloc);
+                    try self.buf.appendSlice(completions[i]);
+                    self.pos = self.buf.len;
                     try self.refreshLine();
 
                     // Restore original buffer into state
                     self.buf.deinit();
-                    self.buf = try Buffer.fromOwnedSlice(old_buf_alloc, old_buf);
+                    self.buf = Buffer.fromOwnedSlice(old_buf_alloc, old_buf);
                     self.pos = old_pos;
                 } else {
                     // Return to original line
@@ -97,10 +99,11 @@ pub const LinenoiseState = struct {
                         if (i < completions.len) {
                             // Replace buffer with text in the selected
                             // completion
-                            const old_buf_alloc = self.buf.list.allocator;
+                            const old_buf_alloc = self.buf.allocator;
                             self.buf.deinit();
-                            self.buf = try Buffer.init(old_buf_alloc, completions[i]);
-                            self.pos = self.buf.len();
+                            self.buf = Buffer.init(old_buf_alloc);
+                            try self.buf.appendSlice(completions[i]);
+                            self.pos = self.buf.len;
                         }
                         finished = true;
                     },
@@ -116,41 +119,41 @@ pub const LinenoiseState = struct {
             const hint = try fun(self.alloc, self.buf.span());
             if (hint) |str| {
                 defer self.alloc.free(str);
-                try buf.append(str);
+                try buf.appendSlice(str);
             }
         }
     }
 
     fn refreshSingleLine(self: *Self) !void {
-        var buf = try Buffer.initSize(self.alloc, 0);
+        var buf = Buffer.init(self.alloc);
         defer buf.deinit();
 
         // Trim buffer if it is too long
         const avail_space = self.cols - self.prompt.len;
         const start = if (self.pos > avail_space) self.pos - avail_space else 0;
-        const end = if (start + avail_space < self.buf.len()) start + avail_space else self.buf.len();
+        const end = if (start + avail_space < self.buf.len) start + avail_space else self.buf.len;
         const trimmed_buf = self.buf.span()[start..end];
 
         // Move cursor to left edge
-        try buf.appendByte('\r');
+        try buf.append('\r');
 
         // Write prompt
-        try buf.append(self.prompt);
+        try buf.appendSlice(self.prompt);
 
         // Write current buffer content
         if (self.ln.mask_mode) {
             for (trimmed_buf) |_| {
-                try buf.appendByte('*');
+                try buf.append('*');
             }
         } else {
-            try buf.append(trimmed_buf);
+            try buf.appendSlice(trimmed_buf);
         }
 
         // Show hints
         try self.refreshShowHints(&buf);
 
         // Erase to the right
-        try buf.append("\x1b[0K");
+        try buf.appendSlice("\x1b[0K");
 
         // Move cursor to original position
         try buf.outStream().print("\r\x1b[{}C", .{self.pos + self.prompt.len});
@@ -160,10 +163,10 @@ pub const LinenoiseState = struct {
     }
 
     fn refreshMultiLine(self: *Self) !void {
-        var buf = try Buffer.initSize(self.alloc, 0);
+        var buf = Buffer.init(self.alloc);
         defer buf.deinit();
 
-        var rows = (self.prompt.len + self.buf.len() + self.cols - 1) / self.cols;
+        var rows = (self.prompt.len + self.buf.len + self.cols - 1) / self.cols;
         var rpos = (self.prompt.len + self.old_pos + self.cols) / self.cols;
         const old_rows = self.max_rows;
 
@@ -180,28 +183,28 @@ pub const LinenoiseState = struct {
         if (old_rows > 0) {
             var j: usize = 0;
             while (j < old_rows - 1) : (j += 1) {
-                try buf.append("\r\x1B[0K\x1B[1A");
+                try buf.appendSlice("\r\x1B[0K\x1B[1A");
             }
         }
 
         // Clear the top line
-        try buf.append("\r\x1B[0K");
+        try buf.appendSlice("\r\x1B[0K");
 
         // Write prompt
-        try buf.append(self.prompt);
+        try buf.appendSlice(self.prompt);
 
         // Write current buffer content
         if (self.ln.mask_mode) {
             for (self.buf.span()) |_| {
-                try buf.appendByte('*');
+                try buf.append('*');
             }
         } else {
-            try buf.append(self.buf.span());
+            try buf.appendSlice(self.buf.span());
         }
 
         // Reserve a newline if we filled all columns
-        if (self.pos > 0 and self.pos == self.buf.len() and (self.pos + self.prompt.len) % self.cols == 0) {
-            try buf.append("\n\r");
+        if (self.pos > 0 and self.pos == self.buf.len and (self.pos + self.prompt.len) % self.cols == 0) {
+            try buf.appendSlice("\n\r");
             rows += 1;
             if (rows > self.max_rows) {
                 self.max_rows = rows;
@@ -221,7 +224,7 @@ pub const LinenoiseState = struct {
         if (col > 0) {
             try buf.outStream().print("\r\x1B[{}C", .{ col });
         } else {
-            try buf.append("\r");
+            try buf.appendSlice("\r");
         }
 
         self.old_pos = self.pos;
@@ -238,7 +241,7 @@ pub const LinenoiseState = struct {
     }
 
     fn editInsert(self: *Self, c: u8) !void {
-        try self.buf.resize(self.buf.len() + 1);
+        try self.buf.resize(self.buf.len + 1);
 
         self.buf.span()[self.pos] = c;
         self.pos += 1;
@@ -253,7 +256,7 @@ pub const LinenoiseState = struct {
     }
 
     fn editMoveRight(self: *Self) !void {
-        if (self.pos < self.buf.len()) {
+        if (self.pos < self.buf.len) {
             self.pos += 1;
             try self.refreshLine();
         }
@@ -267,8 +270,8 @@ pub const LinenoiseState = struct {
     }
 
     fn editMoveEnd(self: *Self) !void {
-        if (self.pos < self.buf.len()) {
-            self.pos = self.buf.len();
+        if (self.pos < self.buf.len) {
+            self.pos = self.buf.len;
             try self.refreshLine();
         }
     }
@@ -294,26 +297,28 @@ pub const LinenoiseState = struct {
             self.ln.history.current = new_index;
 
             // Copy history entry to the current line buffer
-            try self.buf.replaceContents(self.ln.history.hist.toSlice()[new_index]);
-            self.pos = self.buf.len();
+            self.buf.deinit();
+            self.buf = Buffer.init(self.alloc);
+            try self.buf.appendSlice(self.ln.history.hist.toSlice()[new_index]);
+            self.pos = self.buf.len;
 
             try self.refreshLine();
         }
     }
 
     fn editDelete(self: *Self) !void {
-        if (self.buf.len() > 0 and self.pos < self.buf.len()) {
+        if (self.buf.len > 0 and self.pos < self.buf.len) {
             std.mem.copy(u8, self.buf.span()[self.pos..], self.buf.span()[self.pos + 1..]);
-            try self.buf.resize(self.buf.len() - 1);
+            try self.buf.resize(self.buf.len - 1);
             try self.refreshLine();
         }
     }
 
     fn editBackspace(self: *Self) !void {
-        if (self.buf.len() > 0 and self.pos > 0) {
+        if (self.buf.len > 0 and self.pos > 0) {
             std.mem.copy(u8, self.buf.span()[self.pos - 1..], self.buf.span()[self.pos..]);
             self.pos -= 1;
-            try self.buf.resize(self.buf.len() - 1);
+            try self.buf.resize(self.buf.len - 1);
             try self.refreshLine();
         }
     }
@@ -326,7 +331,7 @@ pub const LinenoiseState = struct {
     }
 
     fn editDeletePrevWord(self: *Self) !void {
-        if (self.buf.len() > 0 and self.pos > 0) {
+        if (self.buf.len > 0 and self.pos > 0) {
             const old_pos = self.pos;
             while (self.pos > 0 and self.buf.span()[self.pos - 1] == ' ')
                 self.pos -= 1;
@@ -334,7 +339,7 @@ pub const LinenoiseState = struct {
                 self.pos -= 1;
 
             const diff = old_pos - self.pos;
-            const new_len = self.buf.len() - diff;
+            const new_len = self.buf.len - diff;
             std.mem.copy(u8, self.buf.span()[self.pos..new_len], self.buf.span()[old_pos..]);
             try self.buf.resize(new_len);
             try self.refreshLine();
@@ -347,7 +352,7 @@ pub const LinenoiseState = struct {
     }
 
     fn editKillLineBackward(self: *Self) !void {
-        const new_len = self.buf.len() - self.pos;
+        const new_len = self.buf.len - self.pos;
         std.mem.copy(u8, self.buf.span(), self.buf.span()[self.pos..]);
         self.pos = 0;
         try self.buf.resize(new_len);
