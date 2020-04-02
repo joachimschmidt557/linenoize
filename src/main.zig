@@ -3,15 +3,19 @@ const Allocator = std.mem.Allocator;
 const Buffer = std.ArrayList(u8);
 const File = std.fs.File;
 
-const termios = @cImport({ @cInclude("termios.h"); });
-const ioctl = @cImport({ @cInclude("sys/ioctl.h"); });
+const termios = @cImport({
+    @cInclude("termios.h");
+});
+const ioctl = @cImport({
+    @cInclude("sys/ioctl.h");
+});
 
 const LinenoiseState = @import("state.zig").LinenoiseState;
 pub const History = @import("history.zig").History;
 pub const HintsCallback = (fn (alloc: *Allocator, line: []const u8) Allocator.Error!?[]const u8);
 pub const CompletionsCallback = (fn (alloc: *Allocator, line: []const u8) Allocator.Error![][]const u8);
 
-const unsupported_term = [_][]const u8 { "dumb", "cons25", "emacs" };
+const unsupported_term = [_][]const u8{ "dumb", "cons25", "emacs" };
 
 const key_null = 0;
 const key_ctrl_a = 1;
@@ -52,13 +56,20 @@ fn enableRawMode(fd: File) !termios.termios {
 
     raw = orig;
 
-    raw.c_iflag &= ~(@intCast(c_uint, termios.BRKINT) | @intCast(c_uint, termios.ICRNL) | @intCast(c_uint, termios.INPCK) | @intCast(c_uint, termios.ISTRIP) | @intCast(c_uint, termios.IXON));
+    raw.c_iflag &= ~(@intCast(c_uint, termios.BRKINT) |
+        @intCast(c_uint, termios.ICRNL) |
+        @intCast(c_uint, termios.INPCK) |
+        @intCast(c_uint, termios.ISTRIP) |
+        @intCast(c_uint, termios.IXON));
 
     raw.c_oflag &= ~(@intCast(c_uint, termios.OPOST));
 
     raw.c_cflag |= (@intCast(c_uint, termios.CS8));
 
-    raw.c_lflag &= ~(@intCast(c_uint, termios.ECHO) | @intCast(c_uint, termios.ICANON) | @intCast(c_uint, termios.IEXTEN) | @intCast(c_uint, termios.ISIG));
+    raw.c_lflag &= ~(@intCast(c_uint, termios.ECHO) |
+        @intCast(c_uint, termios.ICANON) |
+        @intCast(c_uint, termios.IEXTEN) |
+        @intCast(c_uint, termios.ISIG));
 
     raw.c_cc[termios.VMIN] = 1;
     raw.c_cc[termios.VTIME] = 0;
@@ -107,7 +118,7 @@ fn getColumns(in: File, out: File) usize {
         out_stream.print("\x1B[999C", .{}) catch return 80;
         const cols = getCursorPosition(in, out) catch return 80;
 
-        out_stream.print("\x1B[{}D", .{ orig_cursor_pos }) catch return 80;
+        out_stream.print("\x1B[{}D", .{orig_cursor_pos}) catch return 80;
 
         return cols;
     } else {
@@ -116,7 +127,7 @@ fn getColumns(in: File, out: File) usize {
 }
 
 fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
-    var state = LinenoiseState {
+    var state = LinenoiseState{
         .alloc = ln.alloc,
         .ln = ln,
 
@@ -197,7 +208,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
                         'F' => try state.editMoveEnd(),
                         else => {},
                     },
-                    else => {}
+                    else => {},
                 }
             },
             key_backspace, key_ctrl_h => try state.editBackspace(),

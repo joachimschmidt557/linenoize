@@ -176,7 +176,7 @@ pub const LinenoiseState = struct {
 
         // Go to the last row
         if (old_rows > rpos) {
-            try buf.outStream().print("\x1B[{}B", .{ old_rows - rpos });
+            try buf.outStream().print("\x1B[{}B", .{old_rows - rpos});
         }
 
         // Clear every row
@@ -216,13 +216,13 @@ pub const LinenoiseState = struct {
 
         // First, y position
         if (rows > rpos2) {
-            try buf.outStream().print("\x1B[{}A", .{ rows - rpos2 });
+            try buf.outStream().print("\x1B[{}A", .{rows - rpos2});
         }
 
         // Then, x position
         const col = (self.prompt.len + self.pos) % self.cols;
         if (col > 0) {
-            try buf.outStream().print("\r\x1B[{}C", .{ col });
+            try buf.outStream().print("\r\x1B[{}C", .{col});
         } else {
             try buf.appendSlice("\r");
         }
@@ -290,7 +290,7 @@ pub const LinenoiseState = struct {
             self.ln.history.hist.toSlice()[old_index] = try std.mem.dupe(self.ln.history.alloc, u8, self.buf.span());
 
             // Update history index
-            const new_index = switch(dir) {
+            const new_index = switch (dir) {
                 .Next => if (old_index < self.ln.history.hist.len - 1) old_index + 1 else self.ln.history.hist.len - 1,
                 .Prev => if (old_index > 0) old_index - 1 else 0,
             };
@@ -308,7 +308,7 @@ pub const LinenoiseState = struct {
 
     fn editDelete(self: *Self) !void {
         if (self.buf.len > 0 and self.pos < self.buf.len) {
-            std.mem.copy(u8, self.buf.span()[self.pos..], self.buf.span()[self.pos + 1..]);
+            std.mem.copy(u8, self.buf.span()[self.pos..], self.buf.span()[self.pos + 1 ..]);
             try self.buf.resize(self.buf.len - 1);
             try self.refreshLine();
         }
@@ -316,7 +316,7 @@ pub const LinenoiseState = struct {
 
     fn editBackspace(self: *Self) !void {
         if (self.buf.len > 0 and self.pos > 0) {
-            std.mem.copy(u8, self.buf.span()[self.pos - 1..], self.buf.span()[self.pos..]);
+            std.mem.copy(u8, self.buf.span()[self.pos - 1 ..], self.buf.span()[self.pos..]);
             self.pos -= 1;
             try self.buf.resize(self.buf.len - 1);
             try self.refreshLine();
