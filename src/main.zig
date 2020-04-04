@@ -144,7 +144,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
     defer state.buf.deinit();
 
     try state.ln.history.add("");
-    state.ln.history.current = state.ln.history.hist.len - 1;
+    state.ln.history.current = state.ln.history.hist.items.len - 1;
     try state.stdout.writeAll(prompt);
 
     while (true) {
@@ -165,7 +165,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
             key_ctrl_b => try state.editMoveLeft(),
             key_ctrl_c => return error.CtrlC,
             key_ctrl_d => {
-                if (state.buf.len > 0) {
+                if (state.buf.items.len > 0) {
                     try state.editDelete();
                 } else {
                     state.ln.history.pop();
@@ -178,7 +178,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
             key_ctrl_l => try state.clearScreen(),
             key_enter => {
                 state.ln.history.pop();
-                return try std.mem.dupe(state.alloc, u8, state.buf.span());
+                return try std.mem.dupe(state.alloc, u8, state.buf.items);
             },
             key_ctrl_n => try state.editHistoryNext(.Next),
             key_ctrl_p => try state.editHistoryNext(.Prev),

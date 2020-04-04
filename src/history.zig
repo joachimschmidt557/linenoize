@@ -20,14 +20,14 @@ pub const History = struct {
 
     /// Deinitializes the history
     pub fn deinit(self: *Self) void {
-        for (self.hist.toSlice()) |x| self.alloc.free(x);
+        for (self.hist.items) |x| self.alloc.free(x);
         self.hist.deinit();
     }
 
     /// Adds this line to the history. Does not take ownership of the line, but
     /// instead copies it
     pub fn add(self: *Self, line: []const u8) !void {
-        if (self.hist.len < 1 or !std.mem.eql(u8, line, self.hist.toSlice()[self.hist.len - 1])) {
+        if (self.hist.items.len < 1 or !std.mem.eql(u8, line, self.hist.items[self.hist.items.len - 1])) {
             try self.hist.append(try std.mem.dupe(self.alloc, u8, line));
         }
     }
@@ -59,7 +59,7 @@ pub const History = struct {
         const file = try std.fs.cwd().createFile(path, .{});
         defer file.close();
 
-        for (self.hist.toSlice()) |line| {
+        for (self.hist.items) |line| {
             try file.writeAll(line);
             try file.writeAll("\n");
         }
