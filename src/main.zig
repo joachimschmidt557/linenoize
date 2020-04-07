@@ -3,9 +3,6 @@ const Allocator = std.mem.Allocator;
 const Buffer = std.ArrayList(u8);
 const File = std.fs.File;
 
-const termios = @cImport({
-    @cInclude("termios.h");
-});
 const ioctl = @cImport({
     @cInclude("sys/ioctl.h");
 });
@@ -46,43 +43,38 @@ fn isUnsupportedTerm() bool {
     } else false;
 }
 
-fn enableRawMode(fd: File) !termios.termios {
-    var orig: termios.termios = undefined;
-    var raw: termios.termios = undefined;
+fn enableRawMode(fd: File) !std.os.termios {
+    const orig = try std.os.tcgetattr(fd.handle);
+    var raw = orig;
 
-    if (termios.tcgetattr(fd.handle, &orig) < 0) {
-        return error.GetAttr;
-    }
+    const tcflag_t = std.os.tcflag_t;
 
-    raw = orig;
+    raw.iflag &= ~(@intCast(tcflag_t, std.os.BRKINT) |
+        @intCast(tcflag_t, std.os.ICRNL) |
+        @intCast(tcflag_t, std.os.INPCK) |
+        @intCast(tcflag_t, std.os.ISTRIP) |
+        @intCast(tcflag_t, std.os.IXON));
 
-    raw.c_iflag &= ~(@intCast(c_uint, termios.BRKINT) |
-        @intCast(c_uint, termios.ICRNL) |
-        @intCast(c_uint, termios.INPCK) |
-        @intCast(c_uint, termios.ISTRIP) |
-        @intCast(c_uint, termios.IXON));
+    raw.oflag &= ~(@intCast(tcflag_t, std.os.OPOST));
 
-    raw.c_oflag &= ~(@intCast(c_uint, termios.OPOST));
+    raw.cflag |= (@intCast(tcflag_t, std.os.CS8));
 
-    raw.c_cflag |= (@intCast(c_uint, termios.CS8));
+    raw.lflag &= ~(@intCast(tcflag_t, std.os.ECHO) |
+        @intCast(tcflag_t, std.os.ICANON) |
+        @intCast(tcflag_t, std.os.IEXTEN) |
+        @intCast(tcflag_t, std.os.ISIG));
 
-    raw.c_lflag &= ~(@intCast(c_uint, termios.ECHO) |
-        @intCast(c_uint, termios.ICANON) |
-        @intCast(c_uint, termios.IEXTEN) |
-        @intCast(c_uint, termios.ISIG));
+    // FIXME
+    // raw.cc[std.os.VMIN] = 1;
+    // raw.cc[std.os.VTIME] = 0;
 
-    raw.c_cc[termios.VMIN] = 1;
-    raw.c_cc[termios.VTIME] = 0;
-
-    if (termios.tcsetattr(fd.handle, termios.TCSAFLUSH, &raw) < 0) {
-        return error.SetAttr;
-    }
+    try std.os.tcsetattr(fd.handle, std.os.TCSA.FLUSH, raw);
 
     return orig;
 }
 
-fn disableRawMode(fd: File, orig: termios.termios) void {
-    _ = termios.tcsetattr(fd.handle, termios.TCSAFLUSH, &orig);
+fn disableRawMode(fd: File, orig: std.os.termios) void {
+    std.os.tcsetattr(fd.handle, std.os.TCSA.FLUSH, orig) catch {};
 }
 
 fn getCursorPosition(in: File, out: File) !usize {

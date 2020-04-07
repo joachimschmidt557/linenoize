@@ -1,7 +1,7 @@
 # zig-linenoise
 
 A port of [linenoise](https://github.com/antirez/linenoise) to zig. It currently
-relies on libc for `termios` and `ioctl`.
+relies on libc for `ioctl`.
 
 ## Features
 
