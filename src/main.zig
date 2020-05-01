@@ -3,12 +3,9 @@ const Allocator = std.mem.Allocator;
 const Buffer = std.ArrayList(u8);
 const File = std.fs.File;
 
-const ioctl = @cImport({
-    @cInclude("sys/ioctl.h");
-});
-
 const LinenoiseState = @import("state.zig").LinenoiseState;
 pub const History = @import("history.zig").History;
+
 pub const HintsCallback = (fn (alloc: *Allocator, line: []const u8) Allocator.Error!?[]const u8);
 pub const CompletionsCallback = (fn (alloc: *Allocator, line: []const u8) Allocator.Error![][]const u8);
 
@@ -100,9 +97,11 @@ fn getCursorPosition(in: File, out: File) !usize {
 }
 
 fn getColumns(in: File, out: File) usize {
-    var ws: ioctl.winsize = undefined;
+    var wsz: std.os.linux.winsize = undefined;
 
-    if (ioctl.ioctl(1, ioctl.TIOCGWINSZ, &ws) == -1 or ws.ws_col == 0) {
+    if (std.os.linux.syscall3(.ioctl, @bitCast(usize, @as(isize, in.handle)), std.os.linux.TIOCGWINSZ, @ptrToInt(&wsz)) == 0) {
+        return wsz.ws_col;
+    } else {
         // ioctl() didn't work
         var out_stream = out.outStream();
         const orig_cursor_pos = getCursorPosition(in, out) catch return 80;
@@ -113,8 +112,6 @@ fn getColumns(in: File, out: File) usize {
         out_stream.print("\x1B[{}D", .{orig_cursor_pos}) catch return 80;
 
         return cols;
-    } else {
-        return ws.ws_col;
     }
 }
 
@@ -213,8 +210,9 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
 /// completions and history
 fn linenoiseRaw(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
     const orig = try enableRawMode(in);
+    defer disableRawMode(in, orig);
+
     const result = try linenoiseEdit(ln, in, out, prompt);
-    disableRawMode(in, orig);
 
     try out.writeAll("\n");
     return result;

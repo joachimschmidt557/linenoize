@@ -24,7 +24,9 @@ fn hints(alloc: *Allocator, buf: []const u8) !?[]const u8 {
 }
 
 pub fn main() !void {
-    const allocator = std.heap.c_allocator;
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = &arena.allocator;
 
     var ln = Linenoise.init(allocator);
     defer ln.deinit();

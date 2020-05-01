@@ -1,7 +1,9 @@
 # zig-linenoise
 
-A port of [linenoise](https://github.com/antirez/linenoise) to zig. It currently
-relies on libc for `ioctl`.
+A port of [linenoise](https://github.com/antirez/linenoise) to zig
+aiming to be a simple readline for command-line applications written
+in zig. It is written in pure zig and doesn't require libc. Currently,
+only linux is supported.
 
 ## Features
 
@@ -41,7 +43,9 @@ fn hints(alloc: *Allocator, buf: []const u8) !?[]const u8 {
 }
 
 pub fn main() !void {
-    const allocator = std.heap.c_allocator;
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = &arena.allocator;
 
     var ln = Linenoise.init(allocator);
     defer ln.deinit();
