@@ -209,13 +209,12 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
 /// Read a line with custom line editing mechanics. This includes hints,
 /// completions and history
 fn linenoiseRaw(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
+    defer out.writeAll("\n") catch {};
+
     const orig = try enableRawMode(in);
     defer disableRawMode(in, orig);
 
-    const result = try linenoiseEdit(ln, in, out, prompt);
-
-    try out.writeAll("\n");
-    return result;
+    return try linenoiseEdit(ln, in, out, prompt);
 }
 
 /// Read a line with no special features (no hints, no completions, no history)
