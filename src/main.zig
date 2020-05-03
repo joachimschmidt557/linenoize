@@ -149,7 +149,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
         }
 
         switch (c) {
-            key_null => {},
+            key_null, key_tab => {},
             key_ctrl_a => try state.editMoveHome(),
             key_ctrl_b => try state.editMoveLeft(),
             key_ctrl_c => return error.CtrlC,
