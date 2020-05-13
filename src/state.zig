@@ -243,7 +243,7 @@ pub const LinenoiseState = struct {
         }
     }
 
-    fn editInsert(self: *Self, c: u8) !void {
+    pub fn editInsert(self: *Self, c: u8) !void {
         try self.buf.resize(self.buf.items.len + 1);
 
         self.buf.items[self.pos] = c;
@@ -251,28 +251,28 @@ pub const LinenoiseState = struct {
         try self.refreshLine();
     }
 
-    fn editMoveLeft(self: *Self) !void {
+    pub fn editMoveLeft(self: *Self) !void {
         if (self.pos > 0) {
             self.pos -= 1;
             try self.refreshLine();
         }
     }
 
-    fn editMoveRight(self: *Self) !void {
+    pub fn editMoveRight(self: *Self) !void {
         if (self.pos < self.buf.items.len) {
             self.pos += 1;
             try self.refreshLine();
         }
     }
 
-    fn editMoveHome(self: *Self) !void {
+    pub fn editMoveHome(self: *Self) !void {
         if (self.pos > 0) {
             self.pos = 0;
             try self.refreshLine();
         }
     }
 
-    fn editMoveEnd(self: *Self) !void {
+    pub fn editMoveEnd(self: *Self) !void {
         if (self.pos < self.buf.items.len) {
             self.pos = self.buf.items.len;
             try self.refreshLine();
@@ -284,7 +284,7 @@ pub const LinenoiseState = struct {
         Prev,
     };
 
-    fn editHistoryNext(self: *Self, dir: HistoryDirection) !void {
+    pub fn editHistoryNext(self: *Self, dir: HistoryDirection) !void {
         if (self.ln.history.hist.items.len > 0) {
             // Update the current history with the current line
             const old_index = self.ln.history.current;
@@ -309,7 +309,7 @@ pub const LinenoiseState = struct {
         }
     }
 
-    fn editDelete(self: *Self) !void {
+    pub fn editDelete(self: *Self) !void {
         if (self.buf.items.len > 0 and self.pos < self.buf.items.len) {
             std.mem.copy(u8, self.buf.items[self.pos..], self.buf.items[self.pos + 1 ..]);
             try self.buf.resize(self.buf.items.len - 1);
@@ -317,7 +317,7 @@ pub const LinenoiseState = struct {
         }
     }
 
-    fn editBackspace(self: *Self) !void {
+    pub fn editBackspace(self: *Self) !void {
         if (self.buf.items.len > 0 and self.pos > 0) {
             std.mem.copy(u8, self.buf.items[self.pos - 1 ..], self.buf.items[self.pos..]);
             self.pos -= 1;
@@ -326,14 +326,14 @@ pub const LinenoiseState = struct {
         }
     }
 
-    fn editSwapPrev(self: *Self) !void {
+    pub fn editSwapPrev(self: *Self) !void {
         if (self.pos > 1) {
             std.mem.swap(u8, &self.buf.items[self.pos - 1], &self.buf.items[self.pos - 2]);
             try self.refreshLine();
         }
     }
 
-    fn editDeletePrevWord(self: *Self) !void {
+    pub fn editDeletePrevWord(self: *Self) !void {
         if (self.buf.items.len > 0 and self.pos > 0) {
             const old_pos = self.pos;
             while (self.pos > 0 and self.buf.items[self.pos - 1] == ' ')
@@ -349,12 +349,12 @@ pub const LinenoiseState = struct {
         }
     }
 
-    fn editKillLineForward(self: *Self) !void {
+    pub fn editKillLineForward(self: *Self) !void {
         try self.buf.resize(self.pos);
         try self.refreshLine();
     }
 
-    fn editKillLineBackward(self: *Self) !void {
+    pub fn editKillLineBackward(self: *Self) !void {
         const new_len = self.buf.items.len - self.pos;
         std.mem.copy(u8, self.buf.items, self.buf.items[self.pos..]);
         self.pos = 0;
