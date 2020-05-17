@@ -35,7 +35,7 @@ fn isUnsupportedTerm() bool {
     const env_var = std.os.getenv("TERM") orelse return false;
 
     return for (unsupported_term) |t| {
-        if (std.mem.eql(u8, env_var, t))
+        if (std.ascii.eqlIgnoreCase(env_var, t))
             break true;
     } else false;
 }
