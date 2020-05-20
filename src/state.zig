@@ -245,6 +245,13 @@ pub const LinenoiseState = struct {
 
     pub fn editInsert(self: *Self, c: u8) !void {
         try self.buf.resize(self.buf.items.len + 1);
+        if (self.buf.items.len > 0 and self.pos < self.buf.items.len - 1) {
+            std.mem.copyBackwards(
+                u8,
+                self.buf.items[self.pos + 1 .. self.buf.items.len],
+                self.buf.items[self.pos .. self.buf.items.len - 1],
+            );
+        }
 
         self.buf.items[self.pos] = c;
         self.pos += 1;
@@ -261,6 +268,26 @@ pub const LinenoiseState = struct {
     pub fn editMoveRight(self: *Self) !void {
         if (self.pos < self.buf.items.len) {
             self.pos += 1;
+            try self.refreshLine();
+        }
+    }
+
+    pub fn editMoveWordEnd(self: *Self) !void {
+        if (self.pos < self.buf.items.len) {
+            while (self.pos < self.buf.items.len and self.buf.items[self.pos] == ' ')
+                self.pos += 1;
+            while (self.pos < self.buf.items.len and self.buf.items[self.pos] != ' ')
+                self.pos += 1;
+            try self.refreshLine();
+        }
+    }
+
+    pub fn editMoveWordStart(self: *Self) !void {
+        if (self.buf.items.len > 0 and self.pos > 0) {
+            while (self.pos > 0 and self.buf.items[self.pos - 1] == ' ')
+                self.pos -= 1;
+            while (self.pos > 0 and self.buf.items[self.pos - 1] != ' ')
+                self.pos -= 1;
             try self.refreshLine();
         }
     }

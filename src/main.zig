@@ -138,8 +138,8 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
 
     while (true) {
         var input_buf: [1]u8 = undefined;
-        const nread = try in.read(&input_buf);
-        var c = if (nread == 1) input_buf[0] else return null;
+        if ((try in.read(&input_buf)) < 1) return null;
+        var c = input_buf[0];
 
         // Browse completions before editing
         if (c == key_tab) {
@@ -175,27 +175,35 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
             key_ctrl_u => try state.editKillLineBackward(),
             key_ctrl_w => try state.editDeletePrevWord(),
             key_esc => {
-                var seq: [2]u8 = undefined;
-                _ = try in.readAll(&seq);
-                switch (seq[0]) {
-                    '[' => switch (seq[1]) {
-                        '0'...'9' => {
-                            _ = try in.readAll(&input_buf);
-                            if (seq[1] == '3' and input_buf[0] == '~')
-                                try state.editDelete();
-                        },
-                        'A' => try state.editHistoryNext(.Prev),
-                        'B' => try state.editHistoryNext(.Next),
-                        'C' => try state.editMoveRight(),
-                        'D' => try state.editMoveLeft(),
-                        'H' => try state.editMoveHome(),
-                        'F' => try state.editMoveEnd(),
-                        else => {},
+                if ((try in.read(&input_buf)) < 1) return null;
+                switch (input_buf[0]) {
+                    'b' => try state.editMoveWordStart(),
+                    'f' => try state.editMoveWordEnd(),
+                    '[' => {
+                        if ((try in.read(&input_buf)) < 1) return null;
+                        switch (input_buf[0]) {
+                            '0'...'9' => {
+                                const num = input_buf[0];
+                                if ((try in.read(&input_buf)) < 1) return null;
+                                if (num == '3' and input_buf[0] == '~')
+                                    try state.editDelete();
+                            },
+                            'A' => try state.editHistoryNext(.Prev),
+                            'B' => try state.editHistoryNext(.Next),
+                            'C' => try state.editMoveRight(),
+                            'D' => try state.editMoveLeft(),
+                            'H' => try state.editMoveHome(),
+                            'F' => try state.editMoveEnd(),
+                            else => {},
+                        }
                     },
-                    '0' => switch (seq[1]) {
-                        'H' => try state.editMoveHome(),
-                        'F' => try state.editMoveEnd(),
-                        else => {},
+                    '0' => {
+                        if ((try in.read(&input_buf)) < 1) return null;
+                        switch (input_buf[0]) {
+                            'H' => try state.editMoveHome(),
+                            'F' => try state.editMoveEnd(),
+                            else => {},
+                        }
                     },
                     else => {},
                 }
