@@ -2,7 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Buffer = std.ArrayList(u8);
 const File = std.fs.File;
-const bufferedOutStream = std.io.bufferedOutStream;
+const bufferedWriter = std.io.bufferedWriter;
 
 const Linenoise = @import("main.zig").Linenoise;
 const History = @import("history.zig").History;
@@ -114,19 +114,19 @@ pub const LinenoiseState = struct {
         return c;
     }
 
-    fn refreshShowHints(self: *Self, out_stream: var) !void {
+    fn refreshShowHints(self: *Self, writer: var) !void {
         if (self.ln.hints_callback) |fun| {
             const hint = try fun(self.alloc, self.buf.items);
             if (hint) |str| {
                 defer self.alloc.free(str);
-                try out_stream.writeAll(str);
+                try writer.writeAll(str);
             }
         }
     }
 
     fn refreshSingleLine(self: *Self) !void {
-        var buf = bufferedOutStream(self.stdout.outStream());
-        var out_stream = buf.outStream();
+        var buf = bufferedWriter(self.stdout.writer());
+        var writer = buf.writer();
 
         // Trim buffer if it is too long
         const avail_space = self.cols - self.prompt.len;
@@ -135,36 +135,36 @@ pub const LinenoiseState = struct {
         const trimmed_buf = self.buf.items[start..end];
 
         // Move cursor to left edge
-        try out_stream.writeAll("\r");
+        try writer.writeAll("\r");
 
         // Write prompt
-        try out_stream.writeAll(self.prompt);
+        try writer.writeAll(self.prompt);
 
         // Write current buffer content
         if (self.ln.mask_mode) {
             for (trimmed_buf) |_| {
-                try out_stream.writeAll("*");
+                try writer.writeAll("*");
             }
         } else {
-            try out_stream.writeAll(trimmed_buf);
+            try writer.writeAll(trimmed_buf);
         }
 
         // Show hints
-        try self.refreshShowHints(out_stream);
+        try self.refreshShowHints(writer);
 
         // Erase to the right
-        try out_stream.writeAll("\x1b[0K");
+        try writer.writeAll("\x1b[0K");
 
         // Move cursor to original position
-        try out_stream.print("\r\x1b[{}C", .{self.pos + self.prompt.len});
+        try writer.print("\r\x1b[{}C", .{self.pos + self.prompt.len});
 
         // Write buffer
         try buf.flush();
     }
 
     fn refreshMultiLine(self: *Self) !void {
-        var buf = bufferedOutStream(self.stdout.outStream());
-        var out_stream = buf.outStream();
+        var buf = bufferedWriter(self.stdout.writer());
+        var writer = buf.writer();
 
         var rows = (self.prompt.len + self.buf.items.len + self.cols - 1) / self.cols;
         var rpos = (self.prompt.len + self.old_pos + self.cols) / self.cols;
@@ -176,38 +176,38 @@ pub const LinenoiseState = struct {
 
         // Go to the last row
         if (old_rows > rpos) {
-            try out_stream.print("\x1B[{}B", .{old_rows - rpos});
+            try writer.print("\x1B[{}B", .{old_rows - rpos});
         }
 
         // Clear every row
         if (old_rows > 0) {
             var j: usize = 0;
             while (j < old_rows - 1) : (j += 1) {
-                try out_stream.writeAll("\r\x1B[0K\x1B[1A");
+                try writer.writeAll("\r\x1B[0K\x1B[1A");
             }
         }
 
         // Clear the top line
-        try out_stream.writeAll("\r\x1B[0K");
+        try writer.writeAll("\r\x1B[0K");
 
         // Write prompt
-        try out_stream.writeAll(self.prompt);
+        try writer.writeAll(self.prompt);
 
         // Write current buffer content
         if (self.ln.mask_mode) {
             for (self.buf.items) |_| {
-                try out_stream.writeAll("*");
+                try writer.writeAll("*");
             }
         } else {
-            try out_stream.writeAll(self.buf.items);
+            try writer.writeAll(self.buf.items);
         }
 
         // Show hints if applicable
-        try self.refreshShowHints(out_stream);
+        try self.refreshShowHints(writer);
 
         // Reserve a newline if we filled all columns
         if (self.pos > 0 and self.pos == self.buf.items.len and (self.pos + self.prompt.len) % self.cols == 0) {
-            try out_stream.writeAll("\n\r");
+            try writer.writeAll("\n\r");
             rows += 1;
             if (rows > self.max_rows) {
                 self.max_rows = rows;
@@ -219,15 +219,15 @@ pub const LinenoiseState = struct {
 
         // First, y position
         if (rows > rpos2) {
-            try out_stream.print("\x1B[{}A", .{rows - rpos2});
+            try writer.print("\x1B[{}A", .{rows - rpos2});
         }
 
         // Then, x position
         const col = (self.prompt.len + self.pos) % self.cols;
         if (col > 0) {
-            try out_stream.print("\r\x1B[{}C", .{col});
+            try writer.print("\r\x1B[{}C", .{col});
         } else {
-            try out_stream.writeAll("\r");
+            try writer.writeAll("\r");
         }
 
         self.old_pos = self.pos;

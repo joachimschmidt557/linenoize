@@ -76,13 +76,13 @@ fn disableRawMode(fd: File, orig: std.os.termios) void {
 
 fn getCursorPosition(in: File, out: File) !usize {
     var buf: [32]u8 = undefined;
-    var in_stream = in.inStream();
+    var reader = in.reader();
 
     // Tell terminal to report cursor to in
     try out.writeAll("\x1B[6n");
 
     // Read answer
-    const answer = (try in_stream.readUntilDelimiterOrEof(&buf, 'R')) orelse
+    const answer = (try reader.readUntilDelimiterOrEof(&buf, 'R')) orelse
         return error.CursorPos;
 
     // Parse answer
@@ -103,13 +103,13 @@ fn getColumns(in: File, out: File) usize {
         return wsz.ws_col;
     } else {
         // ioctl() didn't work
-        var out_stream = out.outStream();
+        var writer = out.writer();
         const orig_cursor_pos = getCursorPosition(in, out) catch return 80;
 
-        out_stream.print("\x1B[999C", .{}) catch return 80;
+        writer.print("\x1B[999C", .{}) catch return 80;
         const cols = getCursorPosition(in, out) catch return 80;
 
-        out_stream.print("\x1B[{}D", .{orig_cursor_pos}) catch return 80;
+        writer.print("\x1B[{}D", .{orig_cursor_pos}) catch return 80;
 
         return cols;
     }
@@ -227,8 +227,8 @@ fn linenoiseRaw(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]con
 
 /// Read a line with no special features (no hints, no completions, no history)
 fn linenoiseNoTTY(alloc: *Allocator, stdin: File) !?[]const u8 {
-    var stream = stdin.inStream();
-    return stream.readUntilDelimiterAlloc(alloc, '\n', std.math.maxInt(usize)) catch |e| switch (e) {
+    var reader = stdin.reader();
+    return reader.readUntilDelimiterAlloc(alloc, '\n', std.math.maxInt(usize)) catch |e| switch (e) {
         error.EndOfStream => return null,
         else => return e,
     };
