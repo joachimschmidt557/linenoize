@@ -14,14 +14,34 @@ only linux is supported.
 - Multi line mode
 - Mask input mode
 
-## Quick Example
+## Minimal example
+
+```zig
+const std = @import("std");
+const Linenoise = @import("linenoise").Linenoise;
+
+pub fn main() !void {
+    const allocator = std.heap.page_allocator;
+
+    var ln = Linenoise.init(allocator);
+    defer ln.deinit();
+
+    while (try ln.linenoise("hello> ")) |input| {
+        defer allocator.free(input);
+        std.debug.warn("input: {}\n", .{input});
+        try ln.history.add(input);
+    }
+}
+```
+
+## Example of more features
 
 ``` zig
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
-const Linenoise = @import("src/main.zig").Linenoise;
+const Linenoise = @import("linenoise").Linenoise;
 
 fn completion(alloc: *Allocator, buf: []const u8) ![][]const u8 {
     if (std.mem.eql(u8, "z", buf)) {
