@@ -1,6 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const Buffer = std.ArrayList(u8);
+const ArrayList = std.ArrayList;
 const File = std.fs.File;
 
 const LinenoiseState = @import("state.zig").LinenoiseState;
@@ -123,7 +123,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
         .stdin = in,
         .stdout = out,
         .prompt = prompt,
-        .buf = Buffer.init(ln.alloc),
+        .buf = ArrayList(u8).init(ln.alloc),
         .pos = 0,
         .old_pos = 0,
         .size = 0,
@@ -167,7 +167,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
             key_ctrl_l => try state.clearScreen(),
             key_enter => {
                 state.ln.history.pop();
-                return try std.mem.dupe(state.alloc, u8, state.buf.items);
+                return try state.alloc.dupe(u8, state.buf.items);
             },
             key_ctrl_n => try state.editHistoryNext(.Next),
             key_ctrl_p => try state.editHistoryNext(.Prev),

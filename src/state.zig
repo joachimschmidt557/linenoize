@@ -1,6 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const Buffer = std.ArrayList(u8);
+const ArrayList = std.ArrayList;
 const File = std.fs.File;
 const bufferedWriter = std.io.bufferedWriter;
 
@@ -16,7 +16,7 @@ pub const LinenoiseState = struct {
 
     stdin: File,
     stdout: File,
-    buf: Buffer,
+    buf: ArrayList(u8),
     prompt: []const u8,
     pos: usize,
     old_pos: usize,
@@ -63,14 +63,14 @@ pub const LinenoiseState = struct {
 
                     // Show suggested completion
                     self.buf.deinit();
-                    self.buf = Buffer.init(old_buf_alloc);
+                    self.buf = ArrayList(u8).init(old_buf_alloc);
                     try self.buf.appendSlice(completions[i]);
                     self.pos = self.buf.items.len;
                     try self.refreshLine();
 
                     // Restore original buffer into state
                     self.buf.deinit();
-                    self.buf = Buffer.fromOwnedSlice(old_buf_alloc, old_buf);
+                    self.buf = ArrayList(u8).fromOwnedSlice(old_buf_alloc, old_buf);
                     self.pos = old_pos;
                 } else {
                     // Return to original line
@@ -101,7 +101,7 @@ pub const LinenoiseState = struct {
                             // completion
                             const old_buf_alloc = self.buf.allocator;
                             self.buf.deinit();
-                            self.buf = Buffer.init(old_buf_alloc);
+                            self.buf = ArrayList(u8).init(old_buf_alloc);
                             try self.buf.appendSlice(completions[i]);
                             self.pos = self.buf.items.len;
                         }
@@ -317,7 +317,7 @@ pub const LinenoiseState = struct {
             const old_index = self.ln.history.current;
             const current_entry = self.ln.history.hist.items[old_index];
             self.ln.history.alloc.free(current_entry);
-            self.ln.history.hist.items[old_index] = try std.mem.dupe(self.ln.history.alloc, u8, self.buf.items);
+            self.ln.history.hist.items[old_index] = try self.ln.history.alloc.dupe(u8, self.buf.items);
 
             // Update history index
             const new_index = switch (dir) {
@@ -328,7 +328,7 @@ pub const LinenoiseState = struct {
 
             // Copy history entry to the current line buffer
             self.buf.deinit();
-            self.buf = Buffer.init(self.alloc);
+            self.buf = ArrayList(u8).init(self.alloc);
             try self.buf.appendSlice(self.ln.history.hist.items[new_index]);
             self.pos = self.buf.items.len;
 

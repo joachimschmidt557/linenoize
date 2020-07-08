@@ -7,8 +7,8 @@ const Linenoise = @import("linenoise").Linenoise;
 fn completion(alloc: *Allocator, buf: []const u8) ![][]const u8 {
     if (std.mem.eql(u8, "z", buf)) {
         var result = ArrayList([]const u8).init(alloc);
-        try result.append(try std.mem.dupe(alloc, u8, "zig"));
-        try result.append(try std.mem.dupe(alloc, u8, "ziglang"));
+        try result.append(try alloc.dupe(u8, "zig"));
+        try result.append(try alloc.dupe(u8, "ziglang"));
         return result.toOwnedSlice();
     } else {
         return &[_][]const u8{};
@@ -17,7 +17,7 @@ fn completion(alloc: *Allocator, buf: []const u8) ![][]const u8 {
 
 fn hints(alloc: *Allocator, buf: []const u8) !?[]const u8 {
     if (std.mem.eql(u8, "hello", buf)) {
-        return try std.mem.dupe(alloc, u8, " World");
+        return try alloc.dupe(u8, " World");
     } else {
         return null;
     }

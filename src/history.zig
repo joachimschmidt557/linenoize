@@ -28,7 +28,7 @@ pub const History = struct {
     /// instead copies it
     pub fn add(self: *Self, line: []const u8) !void {
         if (self.hist.items.len < 1 or !std.mem.eql(u8, line, self.hist.items[self.hist.items.len - 1])) {
-            try self.hist.append(try std.mem.dupe(self.alloc, u8, line));
+            try self.hist.append(try self.alloc.dupe(u8, line));
         }
     }
 
