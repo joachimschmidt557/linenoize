@@ -47,7 +47,7 @@ pub fn main() !void {
     // Enable multiline mode
     // ln.multiline_mode = true;
 
-    while (try ln.linenoise("hello> ")) |input| {
+    while (try ln.linenoise("hellö> ")) |input| {
         defer allocator.free(input);
         std.debug.warn("input: {}\n", .{input});
         try ln.history.add(input);

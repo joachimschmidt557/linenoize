@@ -6,6 +6,7 @@ const bufferedWriter = std.io.bufferedWriter;
 
 const Linenoise = @import("main.zig").Linenoise;
 const History = @import("history.zig").History;
+const width = @import("term.zig").width;
 
 const key_tab = 9;
 const key_esc = 27;
@@ -129,7 +130,8 @@ pub const LinenoiseState = struct {
         var writer = buf.writer();
 
         // Trim buffer if it is too long
-        const avail_space = self.cols - self.prompt.len;
+        const prompt_width = width(self.prompt);
+        const avail_space = self.cols - prompt_width;
         const start = if (self.pos > avail_space) self.pos - avail_space else 0;
         const end = if (start + avail_space < self.buf.items.len) start + avail_space else self.buf.items.len;
         const trimmed_buf = self.buf.items[start..end];
@@ -156,7 +158,7 @@ pub const LinenoiseState = struct {
         try writer.writeAll("\x1b[0K");
 
         // Move cursor to original position
-        try writer.print("\r\x1b[{}C", .{self.pos + self.prompt.len});
+        try writer.print("\r\x1b[{}C", .{self.pos + prompt_width});
 
         // Write buffer
         try buf.flush();
@@ -166,8 +168,9 @@ pub const LinenoiseState = struct {
         var buf = bufferedWriter(self.stdout.writer());
         var writer = buf.writer();
 
-        var rows = (self.prompt.len + self.buf.items.len + self.cols - 1) / self.cols;
-        var rpos = (self.prompt.len + self.old_pos + self.cols) / self.cols;
+        const prompt_width = width(self.prompt);
+        var rows = (prompt_width + self.buf.items.len + self.cols - 1) / self.cols;
+        var rpos = (prompt_width + self.old_pos + self.cols) / self.cols;
         const old_rows = self.max_rows;
 
         if (rows > self.max_rows) {
@@ -206,7 +209,7 @@ pub const LinenoiseState = struct {
         try self.refreshShowHints(writer);
 
         // Reserve a newline if we filled all columns
-        if (self.pos > 0 and self.pos == self.buf.items.len and (self.pos + self.prompt.len) % self.cols == 0) {
+        if (self.pos > 0 and self.pos == self.buf.items.len and (self.pos + prompt_width) % self.cols == 0) {
             try writer.writeAll("\n\r");
             rows += 1;
             if (rows > self.max_rows) {
@@ -215,7 +218,7 @@ pub const LinenoiseState = struct {
         }
 
         // Move cursor to right position:
-        const rpos2 = (self.prompt.len + self.pos + self.cols) / self.cols;
+        const rpos2 = (prompt_width + self.pos + self.cols) / self.cols;
 
         // First, y position
         if (rows > rpos2) {
@@ -223,7 +226,7 @@ pub const LinenoiseState = struct {
         }
 
         // Then, x position
-        const col = (self.prompt.len + self.pos) % self.cols;
+        const col = (prompt_width + self.pos) % self.cols;
         if (col > 0) {
             try writer.print("\r\x1B[{}C", .{col});
         } else {
