@@ -115,7 +115,7 @@ pub const LinenoiseState = struct {
         return c;
     }
 
-    fn refreshShowHints(self: *Self, writer: var) !void {
+    fn refreshShowHints(self: *Self, writer: anytype) !void {
         if (self.ln.hints_callback) |fun| {
             const hint = try fun(self.alloc, self.buf.items);
             if (hint) |str| {
