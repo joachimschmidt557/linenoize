@@ -50,6 +50,6 @@ pub fn main() !void {
     while (try ln.linenoise("hellö> ")) |input| {
         defer allocator.free(input);
         std.debug.warn("input: {}\n", .{input});
-        try ln.history.add(input);
+        try ln.history.addUtf8(input);
     }
 }

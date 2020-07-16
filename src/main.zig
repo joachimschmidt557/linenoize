@@ -5,6 +5,7 @@ const File = std.fs.File;
 
 const LinenoiseState = @import("state.zig").LinenoiseState;
 pub const History = @import("history.zig").History;
+const toUtf8 = @import("term.zig").toUtf8;
 
 pub const HintsCallback = (fn (alloc: *Allocator, line: []const u8) Allocator.Error!?[]const u8);
 pub const CompletionsCallback = (fn (alloc: *Allocator, line: []const u8) Allocator.Error![][]const u8);
@@ -123,7 +124,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
         .stdin = in,
         .stdout = out,
         .prompt = prompt,
-        .buf = ArrayList(u8).init(ln.alloc),
+        .buf = ArrayList(u21).init(ln.alloc),
         .pos = 0,
         .old_pos = 0,
         .size = 0,
@@ -132,7 +133,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
     };
     defer state.buf.deinit();
 
-    try state.ln.history.add("");
+    try state.ln.history.add(&[_]u21{});
     state.ln.history.current = state.ln.history.hist.items.len - 1;
     try state.stdout.writeAll(prompt);
 
@@ -167,7 +168,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
             key_ctrl_l => try state.clearScreen(),
             key_enter => {
                 state.ln.history.pop();
-                return try state.alloc.dupe(u8, state.buf.items);
+                return try toUtf8(ln.alloc, state.buf.items);
             },
             key_ctrl_n => try state.editHistoryNext(.Next),
             key_ctrl_p => try state.editHistoryNext(.Prev),

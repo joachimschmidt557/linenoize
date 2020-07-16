@@ -2,9 +2,13 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
+const term = @import("term.zig");
+const toUtf8 = term.toUtf8;
+const fromUtf8 = term.fromUtf8;
+
 pub const History = struct {
     alloc: *Allocator,
-    hist: ArrayList([]const u8),
+    hist: ArrayList([]const u21),
     current: usize,
 
     const Self = @This();
@@ -13,7 +17,7 @@ pub const History = struct {
     pub fn empty(alloc: *Allocator) Self {
         return Self{
             .alloc = alloc,
-            .hist = ArrayList([]const u8).init(alloc),
+            .hist = ArrayList([]const u21).init(alloc),
             .current = 0,
         };
     }
@@ -26,12 +30,21 @@ pub const History = struct {
 
     /// Adds this line to the history. Does not take ownership of the line, but
     /// instead copies it
-    pub fn add(self: *Self, line: []const u8) !void {
-        if (self.hist.items.len < 1 or !std.mem.eql(u8, line, self.hist.items[self.hist.items.len - 1])) {
-            try self.hist.append(try self.alloc.dupe(u8, line));
+    pub fn add(self: *Self, line: []const u21) !void {
+        if (self.hist.items.len < 1 or !std.mem.eql(u21, line, self.hist.items[self.hist.items.len - 1])) {
+            try self.hist.append(try self.alloc.dupe(u21, line));
         }
     }
 
+    /// Adds a UTF-8 encoded line
+    pub fn addUtf8(self: *Self, line: []const u8) !void {
+        const line_unicode = try fromUtf8(self.alloc, line);
+        defer self.alloc.free(line_unicode);
+
+        try self.add(line_unicode);
+    }
+
+    /// Removes the last item (newest item) of the history
     pub fn pop(self: *Self) void {
         self.alloc.free(self.hist.pop());
     }
@@ -45,7 +58,8 @@ pub const History = struct {
 
         var reader = file.reader();
         while (reader.readUntilDelimiterAlloc(self.alloc, '\n', max_line_len)) |line| {
-            try self.hist.append(line);
+            defer self.alloc.free(line);
+            try self.hist.append(try fromUtf8(self.alloc, line));
         } else |err| {
             switch (err) {
                 error.EndOfStream => return,
@@ -60,7 +74,10 @@ pub const History = struct {
         defer file.close();
 
         for (self.hist.items) |line| {
-            try file.writeAll(line);
+            const line_utf8 = try toUtf8(self.alloc, line);
+            defer self.alloc.free(line_utf8);
+            try file.writeAll(line_utf8);
+
             try file.writeAll("\n");
         }
     }
