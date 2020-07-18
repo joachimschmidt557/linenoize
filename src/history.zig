@@ -2,9 +2,9 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
-const term = @import("term.zig");
-const toUtf8 = term.toUtf8;
-const fromUtf8 = term.fromUtf8;
+const unicode = @import("unicode.zig");
+const toUtf8 = unicode.toUtf8;
+const fromUtf8 = unicode.fromUtf8;
 
 pub const History = struct {
     alloc: *Allocator,

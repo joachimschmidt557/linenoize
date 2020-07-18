@@ -5,12 +5,15 @@ const File = std.fs.File;
 
 const LinenoiseState = @import("state.zig").LinenoiseState;
 pub const History = @import("history.zig").History;
-const toUtf8 = @import("term.zig").toUtf8;
+const toUtf8 = @import("unicode.zig").toUtf8;
+const term = @import("term.zig");
+const isUnsupportedTerm = term.isUnsupportedTerm;
+const enableRawMode = term.enableRawMode;
+const disableRawMode = term.disableRawMode;
+const getColumns = term.getColumns;
 
 pub const HintsCallback = (fn (alloc: *Allocator, line: []const u8) Allocator.Error!?[]const u8);
 pub const CompletionsCallback = (fn (alloc: *Allocator, line: []const u8) Allocator.Error![][]const u8);
-
-const unsupported_term = [_][]const u8{ "dumb", "cons25", "emacs" };
 
 const key_null = 0;
 const key_ctrl_a = 1;
@@ -31,90 +34,6 @@ const key_ctrl_u = 21;
 const key_ctrl_w = 23;
 const key_esc = 27;
 const key_backspace = 127;
-
-fn isUnsupportedTerm() bool {
-    const env_var = std.os.getenv("TERM") orelse return false;
-
-    return for (unsupported_term) |t| {
-        if (std.ascii.eqlIgnoreCase(env_var, t))
-            break true;
-    } else false;
-}
-
-fn enableRawMode(fd: File) !std.os.termios {
-    const orig = try std.os.tcgetattr(fd.handle);
-    var raw = orig;
-
-    const tcflag_t = std.os.tcflag_t;
-
-    raw.iflag &= ~(@intCast(tcflag_t, std.os.BRKINT) |
-        @intCast(tcflag_t, std.os.ICRNL) |
-        @intCast(tcflag_t, std.os.INPCK) |
-        @intCast(tcflag_t, std.os.ISTRIP) |
-        @intCast(tcflag_t, std.os.IXON));
-
-    raw.oflag &= ~(@intCast(tcflag_t, std.os.OPOST));
-
-    raw.cflag |= (@intCast(tcflag_t, std.os.CS8));
-
-    raw.lflag &= ~(@intCast(tcflag_t, std.os.ECHO) |
-        @intCast(tcflag_t, std.os.ICANON) |
-        @intCast(tcflag_t, std.os.IEXTEN) |
-        @intCast(tcflag_t, std.os.ISIG));
-
-    // FIXME
-    // raw.cc[std.os.VMIN] = 1;
-    // raw.cc[std.os.VTIME] = 0;
-
-    try std.os.tcsetattr(fd.handle, std.os.TCSA.FLUSH, raw);
-
-    return orig;
-}
-
-fn disableRawMode(fd: File, orig: std.os.termios) void {
-    std.os.tcsetattr(fd.handle, std.os.TCSA.FLUSH, orig) catch {};
-}
-
-fn getCursorPosition(in: File, out: File) !usize {
-    var buf: [32]u8 = undefined;
-    var reader = in.reader();
-
-    // Tell terminal to report cursor to in
-    try out.writeAll("\x1B[6n");
-
-    // Read answer
-    const answer = (try reader.readUntilDelimiterOrEof(&buf, 'R')) orelse
-        return error.CursorPos;
-
-    // Parse answer
-    if (!std.mem.startsWith(u8, "\x1B[", answer))
-        return error.CursorPos;
-
-    var iter = std.mem.split(answer[2..], ";");
-    const y = iter.next() orelse return error.CursorPos;
-    const x = iter.next() orelse return error.CursorPos;
-
-    return try std.fmt.parseInt(usize, x, 10);
-}
-
-fn getColumns(in: File, out: File) usize {
-    var wsz: std.os.linux.winsize = undefined;
-
-    if (std.os.linux.syscall3(.ioctl, @bitCast(usize, @as(isize, in.handle)), std.os.linux.TIOCGWINSZ, @ptrToInt(&wsz)) == 0) {
-        return wsz.ws_col;
-    } else {
-        // ioctl() didn't work
-        var writer = out.writer();
-        const orig_cursor_pos = getCursorPosition(in, out) catch return 80;
-
-        writer.print("\x1B[999C", .{}) catch return 80;
-        const cols = getCursorPosition(in, out) catch return 80;
-
-        writer.print("\x1B[{}D", .{orig_cursor_pos}) catch return 80;
-
-        return cols;
-    }
-}
 
 fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
     var state = LinenoiseState{
@@ -210,7 +129,16 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
                 }
             },
             key_backspace, key_ctrl_h => try state.editBackspace(),
-            else => try state.editInsert(c),
+            else => {
+                var utf8_buf: [4]u8 = undefined;
+                const utf8_len = std.unicode.utf8CodepointSequenceLength(c) catch continue;
+
+                utf8_buf[0] = c;
+                if ((try in.read(utf8_buf[1..utf8_len])) < utf8_len - 1) return null;
+
+                const codepoint = std.unicode.utf8Decode(utf8_buf[0..utf8_len]) catch continue;
+                try state.editInsert(codepoint);
+            },
         }
     }
 }

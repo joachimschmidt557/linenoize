@@ -1,80 +1,88 @@
 const std = @import("std");
-const Allocator = std.mem.Allocator;
-const expectEqualSlices = std.testing.expectEqualSlices;
+const File = std.fs.File;
 
-const wcwidth = @import("wcwidth/src/main.zig").wcwidth;
+const unsupported_term = [_][]const u8{ "dumb", "cons25", "emacs" };
 
-pub fn width(s: []const u8) usize {
-    var result: usize = 0;
+pub fn isUnsupportedTerm() bool {
+    const env_var = std.os.getenv("TERM") orelse return false;
 
-    var escape_seq = false;
-    const view = std.unicode.Utf8View.init(s) catch return 0;
-    var iter = view.iterator();
-    while (iter.nextCodepoint()) |codepoint| {
-        if (escape_seq) {
-            if (codepoint == 'm') {
-                escape_seq = false;
-            }
-        } else {
-            if (codepoint == '\x1b') {
-                escape_seq = true;
-            } else {
-                const wcw = wcwidth(codepoint);
-                if (wcw < 0) return 0;
-                result += @intCast(usize, wcw);
-            }
-        }
+    return for (unsupported_term) |t| {
+        if (std.ascii.eqlIgnoreCase(env_var, t))
+            break true;
+    } else false;
+}
+
+pub fn enableRawMode(fd: File) !std.os.termios {
+    const orig = try std.os.tcgetattr(fd.handle);
+    var raw = orig;
+
+    const tcflag_t = std.os.tcflag_t;
+
+    raw.iflag &= ~(@intCast(tcflag_t, std.os.BRKINT) |
+        @intCast(tcflag_t, std.os.ICRNL) |
+        @intCast(tcflag_t, std.os.INPCK) |
+        @intCast(tcflag_t, std.os.ISTRIP) |
+        @intCast(tcflag_t, std.os.IXON));
+
+    raw.oflag &= ~(@intCast(tcflag_t, std.os.OPOST));
+
+    raw.cflag |= (@intCast(tcflag_t, std.os.CS8));
+
+    raw.lflag &= ~(@intCast(tcflag_t, std.os.ECHO) |
+        @intCast(tcflag_t, std.os.ICANON) |
+        @intCast(tcflag_t, std.os.IEXTEN) |
+        @intCast(tcflag_t, std.os.ISIG));
+
+    // FIXME
+    // raw.cc[std.os.VMIN] = 1;
+    // raw.cc[std.os.VTIME] = 0;
+
+    try std.os.tcsetattr(fd.handle, std.os.TCSA.FLUSH, raw);
+
+    return orig;
+}
+
+pub fn disableRawMode(fd: File, orig: std.os.termios) void {
+    std.os.tcsetattr(fd.handle, std.os.TCSA.FLUSH, orig) catch {};
+}
+
+fn getCursorPosition(in: File, out: File) !usize {
+    var buf: [32]u8 = undefined;
+    var reader = in.reader();
+
+    // Tell terminal to report cursor to in
+    try out.writeAll("\x1B[6n");
+
+    // Read answer
+    const answer = (try reader.readUntilDelimiterOrEof(&buf, 'R')) orelse
+        return error.CursorPos;
+
+    // Parse answer
+    if (!std.mem.startsWith(u8, "\x1B[", answer))
+        return error.CursorPos;
+
+    var iter = std.mem.split(answer[2..], ";");
+    const y = iter.next() orelse return error.CursorPos;
+    const x = iter.next() orelse return error.CursorPos;
+
+    return try std.fmt.parseInt(usize, x, 10);
+}
+
+pub fn getColumns(in: File, out: File) usize {
+    var wsz: std.os.linux.winsize = undefined;
+
+    if (std.os.linux.syscall3(.ioctl, @bitCast(usize, @as(isize, in.handle)), std.os.linux.TIOCGWINSZ, @ptrToInt(&wsz)) == 0) {
+        return wsz.ws_col;
+    } else {
+        // ioctl() didn't work
+        var writer = out.writer();
+        const orig_cursor_pos = getCursorPosition(in, out) catch return 80;
+
+        writer.print("\x1B[999C", .{}) catch return 80;
+        const cols = getCursorPosition(in, out) catch return 80;
+
+        writer.print("\x1B[{}D", .{orig_cursor_pos}) catch return 80;
+
+        return cols;
     }
-
-    return result;
-}
-
-pub fn toUtf8(allocator: *Allocator, s: []const u21) ![]const u8 {
-    var result = std.ArrayList(u8).init(allocator);
-    var buf: [4]u8 = undefined;
-
-    for (s) |c| {
-        const amt = try std.unicode.utf8Encode(c, &buf);
-        try result.appendSlice(buf[0..amt]);
-    }
-
-    return result.toOwnedSlice();
-}
-
-test "toUtf8" {
-    const unicode = [_]u21{ 'a', 'b', 'ü' };
-    const utf8 = "abü";
-
-    const allocator = std.testing.allocator;
-
-    const converted = try toUtf8(allocator, &unicode);
-    defer allocator.free(converted);
-
-    expectEqualSlices(u8, utf8, converted);
-}
-
-pub fn fromUtf8(allocator: *Allocator, s: []const u8) ![]const u21 {
-    var result = std.ArrayList(u21).init(allocator);
-
-    var i: usize = 0;
-    while (i < s.len) {
-        const utf8_len = try std.unicode.utf8CodepointSequenceLength(s[i]);
-        try result.append(try std.unicode.utf8Decode(s[i .. i + utf8_len]));
-
-        i += utf8_len;
-    }
-
-    return result.toOwnedSlice();
-}
-
-test "fromUtf8" {
-    const unicode = [_]u21{ 'a', 'b', 'ü' };
-    const utf8 = "abü";
-
-    const allocator = std.testing.allocator;
-
-    const converted = try fromUtf8(allocator, utf8);
-    defer allocator.free(converted);
-
-    expectEqualSlices(u21, &unicode, converted);
 }

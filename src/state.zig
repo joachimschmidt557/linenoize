@@ -6,10 +6,10 @@ const bufferedWriter = std.io.bufferedWriter;
 
 const Linenoise = @import("main.zig").Linenoise;
 const History = @import("history.zig").History;
-const term = @import("term.zig");
-const width = term.width;
-const toUtf8 = term.toUtf8;
-const fromUtf8 = term.fromUtf8;
+const unicode = @import("unicode.zig");
+const width = unicode.width;
+const toUtf8 = unicode.toUtf8;
+const fromUtf8 = unicode.fromUtf8;
 
 const key_tab = 9;
 const key_esc = 27;
@@ -267,7 +267,7 @@ pub const LinenoiseState = struct {
         }
     }
 
-    pub fn editInsert(self: *Self, c: u8) !void {
+    pub fn editInsert(self: *Self, c: u21) !void {
         try self.buf.resize(self.buf.items.len + 1);
         if (self.buf.items.len > 0 and self.pos < self.buf.items.len - 1) {
             std.mem.copyBackwards(
