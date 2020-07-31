@@ -15,7 +15,7 @@ const key_tab = 9;
 const key_esc = 27;
 
 pub const LinenoiseState = struct {
-    alloc: *Allocator,
+    allocator: *Allocator,
     ln: *Linenoise,
 
     stdin: File,
@@ -45,13 +45,13 @@ pub const LinenoiseState = struct {
         var c: ?u8 = null;
 
         const fun = self.ln.completions_callback orelse return null;
-        const buf_utf8 = try toUtf8(self.alloc, self.buf.items);
-        defer self.alloc.free(buf_utf8);
+        const buf_utf8 = try toUtf8(self.allocator, self.buf.items);
+        defer self.allocator.free(buf_utf8);
 
-        const completions = try fun(self.alloc, buf_utf8);
+        const completions = try fun(self.allocator, buf_utf8);
         defer {
-            for (completions) |x| self.alloc.free(x);
-            self.alloc.free(completions);
+            for (completions) |x| self.allocator.free(x);
+            self.allocator.free(completions);
         }
 
         if (completions.len == 0) {
@@ -64,16 +64,16 @@ pub const LinenoiseState = struct {
                 if (i < completions.len) {
                     // Change to completion nr. i
                     // First, save buffer so we can restore it later
-                    const old_buf_alloc = self.buf.allocator;
+                    const old_buf_allocator = self.buf.allocator;
                     const old_buf = self.buf.toOwnedSlice();
                     const old_pos = self.pos;
 
                     // Show suggested completion
                     self.buf.deinit();
-                    self.buf = ArrayList(u21).init(old_buf_alloc);
+                    self.buf = ArrayList(u21).init(old_buf_allocator);
 
-                    const completion_unicode = try fromUtf8(self.alloc, completions[i]);
-                    defer self.alloc.free(completion_unicode);
+                    const completion_unicode = try fromUtf8(self.allocator, completions[i]);
+                    defer self.allocator.free(completion_unicode);
                     try self.buf.appendSlice(completion_unicode);
 
                     self.pos = self.buf.items.len;
@@ -81,7 +81,7 @@ pub const LinenoiseState = struct {
 
                     // Restore original buffer into state
                     self.buf.deinit();
-                    self.buf = ArrayList(u21).fromOwnedSlice(old_buf_alloc, old_buf);
+                    self.buf = ArrayList(u21).fromOwnedSlice(old_buf_allocator, old_buf);
                     self.pos = old_pos;
                 } else {
                     // Return to original line
@@ -110,12 +110,12 @@ pub const LinenoiseState = struct {
                         if (i < completions.len) {
                             // Replace buffer with text in the selected
                             // completion
-                            const old_buf_alloc = self.buf.allocator;
+                            const old_buf_allocator = self.buf.allocator;
                             self.buf.deinit();
-                            self.buf = ArrayList(u21).init(old_buf_alloc);
+                            self.buf = ArrayList(u21).init(old_buf_allocator);
 
-                            const completion_unicode = try fromUtf8(self.alloc, completions[i]);
-                            defer self.alloc.free(completion_unicode);
+                            const completion_unicode = try fromUtf8(self.allocator, completions[i]);
+                            defer self.allocator.free(completion_unicode);
                             try self.buf.appendSlice(completion_unicode);
 
                             self.pos = self.buf.items.len;
@@ -131,12 +131,12 @@ pub const LinenoiseState = struct {
 
     fn refreshShowHints(self: *Self, writer: anytype) !void {
         if (self.ln.hints_callback) |fun| {
-            const buf_utf8 = try toUtf8(self.alloc, self.buf.items);
-            defer self.alloc.free(buf_utf8);
-            const hint = try fun(self.alloc, buf_utf8);
+            const buf_utf8 = try toUtf8(self.allocator, self.buf.items);
+            defer self.allocator.free(buf_utf8);
+            const hint = try fun(self.allocator, buf_utf8);
 
             if (hint) |str| {
-                defer self.alloc.free(str);
+                defer self.allocator.free(str);
                 try writer.writeAll(str);
             }
         }
@@ -165,8 +165,8 @@ pub const LinenoiseState = struct {
                 try writer.writeAll("*");
             }
         } else {
-            const trimmed_buf_utf8 = try toUtf8(self.alloc, trimmed_buf);
-            defer self.alloc.free(trimmed_buf_utf8);
+            const trimmed_buf_utf8 = try toUtf8(self.allocator, trimmed_buf);
+            defer self.allocator.free(trimmed_buf_utf8);
             try writer.writeAll(trimmed_buf_utf8);
         }
 
@@ -221,8 +221,8 @@ pub const LinenoiseState = struct {
                 try writer.writeAll("*");
             }
         } else {
-            const buf_utf8 = try toUtf8(self.alloc, self.buf.items);
-            defer self.alloc.free(buf_utf8);
+            const buf_utf8 = try toUtf8(self.allocator, self.buf.items);
+            defer self.allocator.free(buf_utf8);
             try writer.writeAll(buf_utf8);
         }
 
@@ -340,8 +340,8 @@ pub const LinenoiseState = struct {
             // Update the current history with the current line
             const old_index = self.ln.history.current;
             const current_entry = self.ln.history.hist.items[old_index];
-            self.ln.history.alloc.free(current_entry);
-            self.ln.history.hist.items[old_index] = try self.ln.history.alloc.dupe(u21, self.buf.items);
+            self.ln.history.allocator.free(current_entry);
+            self.ln.history.hist.items[old_index] = try self.ln.history.allocator.dupe(u21, self.buf.items);
 
             // Update history index
             const new_index = switch (dir) {
@@ -352,7 +352,7 @@ pub const LinenoiseState = struct {
 
             // Copy history entry to the current line buffer
             self.buf.deinit();
-            self.buf = ArrayList(u21).init(self.alloc);
+            self.buf = ArrayList(u21).init(self.allocator);
             try self.buf.appendSlice(self.ln.history.hist.items[new_index]);
             self.pos = self.buf.items.len;
 

@@ -12,8 +12,8 @@ const enableRawMode = term.enableRawMode;
 const disableRawMode = term.disableRawMode;
 const getColumns = term.getColumns;
 
-pub const HintsCallback = (fn (alloc: *Allocator, line: []const u8) Allocator.Error!?[]const u8);
-pub const CompletionsCallback = (fn (alloc: *Allocator, line: []const u8) Allocator.Error![][]const u8);
+pub const HintsCallback = (fn (allocator: *Allocator, line: []const u8) Allocator.Error!?[]const u8);
+pub const CompletionsCallback = (fn (allocator: *Allocator, line: []const u8) Allocator.Error![][]const u8);
 
 const key_null = 0;
 const key_ctrl_a = 1;
@@ -37,13 +37,13 @@ const key_backspace = 127;
 
 fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
     var state = LinenoiseState{
-        .alloc = ln.alloc,
+        .allocator = ln.allocator,
         .ln = ln,
 
         .stdin = in,
         .stdout = out,
         .prompt = prompt,
-        .buf = ArrayList(u21).init(ln.alloc),
+        .buf = ArrayList(u21).init(ln.allocator),
         .pos = 0,
         .old_pos = 0,
         .size = 0,
@@ -87,7 +87,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
             key_ctrl_l => try state.clearScreen(),
             key_enter => {
                 state.ln.history.pop();
-                return try toUtf8(ln.alloc, state.buf.items);
+                return try toUtf8(ln.allocator, state.buf.items);
             },
             key_ctrl_n => try state.editHistoryNext(.Next),
             key_ctrl_p => try state.editHistoryNext(.Prev),
@@ -155,16 +155,16 @@ fn linenoiseRaw(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]con
 }
 
 /// Read a line with no special features (no hints, no completions, no history)
-fn linenoiseNoTTY(alloc: *Allocator, stdin: File) !?[]const u8 {
+fn linenoiseNoTTY(allocator: *Allocator, stdin: File) !?[]const u8 {
     var reader = stdin.reader();
-    return reader.readUntilDelimiterAlloc(alloc, '\n', std.math.maxInt(usize)) catch |e| switch (e) {
+    return reader.readUntilDelimiterAlloc(allocator, '\n', std.math.maxInt(usize)) catch |e| switch (e) {
         error.EndOfStream => return null,
         else => return e,
     };
 }
 
 pub const Linenoise = struct {
-    alloc: *Allocator,
+    allocator: *Allocator,
     history: History,
     multiline_mode: bool,
     mask_mode: bool,
@@ -174,10 +174,10 @@ pub const Linenoise = struct {
     const Self = @This();
 
     /// Initialize a linenoise struct
-    pub fn init(alloc: *Allocator) Self {
+    pub fn init(allocator: *Allocator) Self {
         return Self{
-            .alloc = alloc,
-            .history = History.empty(alloc),
+            .allocator = allocator,
+            .history = History.empty(allocator),
             .mask_mode = false,
             .multiline_mode = false,
             .hints_callback = null,
@@ -198,12 +198,12 @@ pub const Linenoise = struct {
         if (stdin_file.isTty()) {
             if (isUnsupportedTerm()) {
                 try stdout_file.writeAll(prompt);
-                return try linenoiseNoTTY(self.alloc, stdin_file);
+                return try linenoiseNoTTY(self.allocator, stdin_file);
             } else {
                 return try linenoiseRaw(self, stdin_file, stdout_file, prompt);
             }
         } else {
-            return try linenoiseNoTTY(self.alloc, stdin_file);
+            return try linenoiseNoTTY(self.allocator, stdin_file);
         }
     }
 };
