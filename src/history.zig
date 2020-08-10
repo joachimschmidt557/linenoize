@@ -54,7 +54,7 @@ pub const History = struct {
         const file = try std.fs.cwd().openFile(path, .{});
         defer file.close();
 
-        const max_line_len = std.mem.page_size;
+        const max_line_len = std.math.maxInt(usize);
 
         var reader = file.reader();
         while (reader.readUntilDelimiterAlloc(self.allocator, '\n', max_line_len)) |line| {
@@ -82,3 +82,11 @@ pub const History = struct {
         }
     }
 };
+
+test "history" {
+    var hist = History.empty(std.testing.allocator);
+    defer hist.deinit();
+
+    try hist.add(&[_]u21{ 'H', 'e', 'l', 'l', 'o' });
+    hist.pop();
+}

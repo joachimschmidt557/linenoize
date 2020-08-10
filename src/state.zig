@@ -10,6 +10,8 @@ const unicode = @import("unicode.zig");
 const width = unicode.width;
 const toUtf8 = unicode.toUtf8;
 const fromUtf8 = unicode.fromUtf8;
+const term = @import("term.zig");
+const getColumns = term.getColumns;
 
 const key_tab = 9;
 const key_esc = 27;
@@ -29,6 +31,23 @@ pub const LinenoiseState = struct {
     max_rows: usize,
 
     const Self = @This();
+
+    pub fn init(ln: *Linenoise, in: File, out: File, prompt: []const u8) Self {
+        return Self{
+            .allocator = ln.allocator,
+            .ln = ln,
+
+            .stdin = in,
+            .stdout = out,
+            .prompt = prompt,
+            .buf = ArrayList(u21).init(ln.allocator),
+            .pos = 0,
+            .old_pos = 0,
+            .size = 0,
+            .cols = getColumns(in, out),
+            .max_rows = 0,
+        };
+    }
 
     pub fn clearScreen(self: *Self) !void {
         try self.stdout.writeAll("\x1b[H\x1b[2J");

@@ -36,20 +36,7 @@ const key_esc = 27;
 const key_backspace = 127;
 
 fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
-    var state = LinenoiseState{
-        .allocator = ln.allocator,
-        .ln = ln,
-
-        .stdin = in,
-        .stdout = out,
-        .prompt = prompt,
-        .buf = ArrayList(u21).init(ln.allocator),
-        .pos = 0,
-        .old_pos = 0,
-        .size = 0,
-        .cols = getColumns(in, out),
-        .max_rows = 0,
-    };
+    var state = LinenoiseState.init(ln, in, out, prompt);
     defer state.buf.deinit();
 
     try state.ln.history.add(&[_]u21{});
@@ -157,7 +144,8 @@ fn linenoiseRaw(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]con
 /// Read a line with no special features (no hints, no completions, no history)
 fn linenoiseNoTTY(allocator: *Allocator, stdin: File) !?[]const u8 {
     var reader = stdin.reader();
-    return reader.readUntilDelimiterAlloc(allocator, '\n', std.math.maxInt(usize)) catch |e| switch (e) {
+    const max_line_len = std.math.maxInt(usize);
+    return reader.readUntilDelimiterAlloc(allocator, '\n', max_line_len) catch |e| switch (e) {
         error.EndOfStream => return null,
         else => return e,
     };
@@ -207,3 +195,7 @@ pub const Linenoise = struct {
         }
     }
 };
+
+test "all" {
+    _ = @import("history.zig");
+}
