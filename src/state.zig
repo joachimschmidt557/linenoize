@@ -129,26 +129,27 @@ pub const LinenoiseState = struct {
         return c;
     }
 
-    fn refreshShowHints(self: *Self, writer: anytype) !void {
+    fn getHint(self: *Self) !?[]const u8 {
         if (self.ln.hints_callback) |fun| {
             const buf_utf8 = try toUtf8(self.allocator, self.buf.items);
             defer self.allocator.free(buf_utf8);
-            const hint = try fun(self.allocator, buf_utf8);
-
-            if (hint) |str| {
-                defer self.allocator.free(str);
-                try writer.writeAll(str);
-            }
+            return try fun(self.allocator, buf_utf8);
         }
+
+        return null;
     }
 
     fn refreshSingleLine(self: *Self) !void {
         var buf = bufferedWriter(self.stdout.writer());
         var writer = buf.writer();
 
+        const hint = try self.getHint();
+        defer if (hint) |str| self.allocator.free(str);
+
         // Trim buffer if it is too long
         const prompt_width = width(self.prompt);
-        const avail_space = self.cols - prompt_width;
+        const hint_width = if (hint) |str| width(str) else 0;
+        const avail_space = self.cols - prompt_width - hint_width - 1;
         const start = if (self.pos > avail_space) self.pos - avail_space else 0;
         const end = if (start + avail_space < self.buf.items.len) start + avail_space else self.buf.items.len;
         const trimmed_buf = self.buf.items[start..end];
@@ -171,13 +172,16 @@ pub const LinenoiseState = struct {
         }
 
         // Show hints
-        try self.refreshShowHints(writer);
+        if (hint) |str| {
+            try writer.writeAll(str);
+        }
 
         // Erase to the right
         try writer.writeAll("\x1b[0K");
 
         // Move cursor to original position
-        try writer.print("\r\x1b[{}C", .{self.pos + prompt_width});
+        const pos = if (self.pos > avail_space) self.cols - hint_width - 1 else prompt_width + self.pos;
+        try writer.print("\r\x1b[{}C", .{pos});
 
         // Write buffer
         try buf.flush();
@@ -187,8 +191,13 @@ pub const LinenoiseState = struct {
         var buf = bufferedWriter(self.stdout.writer());
         var writer = buf.writer();
 
+        const hint = try self.getHint();
+        defer if (hint) |str| self.allocator.free(str);
+
         const prompt_width = width(self.prompt);
-        var rows = (prompt_width + self.buf.items.len + self.cols - 1) / self.cols;
+        const hint_width = if (hint) |str| width(str) else 0;
+        const total_width = prompt_width + self.buf.items.len + hint_width;
+        var rows = (total_width + self.cols - 1) / self.cols;
         var rpos = (prompt_width + self.old_pos + self.cols) / self.cols;
         const old_rows = self.max_rows;
 
@@ -227,10 +236,12 @@ pub const LinenoiseState = struct {
         }
 
         // Show hints if applicable
-        try self.refreshShowHints(writer);
+        if (hint) |str| {
+            try writer.writeAll(str);
+        }
 
         // Reserve a newline if we filled all columns
-        if (self.pos > 0 and self.pos == self.buf.items.len and (self.pos + prompt_width) % self.cols == 0) {
+        if (self.pos > 0 and self.pos == self.buf.items.len and total_width % self.cols == 0) {
             try writer.writeAll("\n\r");
             rows += 1;
             if (rows > self.max_rows) {
