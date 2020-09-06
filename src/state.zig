@@ -361,8 +361,8 @@ pub const LinenoiseState = struct {
     }
 
     pub const HistoryDirection = enum {
-        Next,
-        Prev,
+        next,
+        prev,
     };
 
     pub fn editHistoryNext(self: *Self, dir: HistoryDirection) !void {
@@ -375,8 +375,8 @@ pub const LinenoiseState = struct {
 
             // Update history index
             const new_index = switch (dir) {
-                .Next => if (old_index < self.ln.history.hist.items.len - 1) old_index + 1 else self.ln.history.hist.items.len - 1,
-                .Prev => if (old_index > 0) old_index - 1 else 0,
+                .next => if (old_index < self.ln.history.hist.items.len - 1) old_index + 1 else self.ln.history.hist.items.len - 1,
+                .prev => if (old_index > 0) old_index - 1 else 0,
             };
             self.ln.history.current = new_index;
 

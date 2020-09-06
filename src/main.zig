@@ -76,8 +76,8 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
                 state.ln.history.pop();
                 return try toUtf8(ln.allocator, state.buf.items);
             },
-            key_ctrl_n => try state.editHistoryNext(.Next),
-            key_ctrl_p => try state.editHistoryNext(.Prev),
+            key_ctrl_n => try state.editHistoryNext(.next),
+            key_ctrl_p => try state.editHistoryNext(.prev),
             key_ctrl_t => try state.editSwapPrev(),
             key_ctrl_u => try state.editKillLineBackward(),
             key_ctrl_w => try state.editDeletePrevWord(),
@@ -95,8 +95,8 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
                                 if (num == '3' and input_buf[0] == '~')
                                     try state.editDelete();
                             },
-                            'A' => try state.editHistoryNext(.Prev),
-                            'B' => try state.editHistoryNext(.Next),
+                            'A' => try state.editHistoryNext(.prev),
+                            'B' => try state.editHistoryNext(.next),
                             'C' => try state.editMoveRight(),
                             'D' => try state.editMoveLeft(),
                             'H' => try state.editMoveHome(),
