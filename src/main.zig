@@ -12,8 +12,8 @@ const enableRawMode = term.enableRawMode;
 const disableRawMode = term.disableRawMode;
 const getColumns = term.getColumns;
 
-pub const HintsCallback = (fn (allocator: *Allocator, line: []const u8) Allocator.Error!?[]const u8);
-pub const CompletionsCallback = (fn (allocator: *Allocator, line: []const u8) Allocator.Error![][]const u8);
+pub const HintsCallback = (fn (*Allocator, []const u8) Allocator.Error!?[]const u8);
+pub const CompletionsCallback = (fn (*Allocator, []const u8) Allocator.Error![][]const u8);
 
 const key_null = 0;
 const key_ctrl_a = 1;
