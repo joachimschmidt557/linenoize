@@ -2,4 +2,3 @@ zig-cache/
 example
 example.o
 history.txt
-src/wcwidth
