@@ -5,7 +5,6 @@ const File = std.fs.File;
 
 const LinenoiseState = @import("state.zig").LinenoiseState;
 pub const History = @import("history.zig").History;
-const toUtf8 = @import("unicode.zig").toUtf8;
 const term = @import("term.zig");
 const isUnsupportedTerm = term.isUnsupportedTerm;
 const enableRawMode = term.enableRawMode;
@@ -39,7 +38,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
     var state = LinenoiseState.init(ln, in, out, prompt);
     defer state.buf.deinit();
 
-    try state.ln.history.add(&[_]u21{});
+    try state.ln.history.add("");
     state.ln.history.current = state.ln.history.hist.items.len - 1;
     try state.stdout.writeAll(prompt);
 
@@ -74,7 +73,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
             key_ctrl_l => try state.clearScreen(),
             key_enter => {
                 state.ln.history.pop();
-                return try toUtf8(ln.allocator, state.buf.items);
+                return try ln.allocator.dupe(u8, state.buf.items);
             },
             key_ctrl_n => try state.editHistoryNext(.next),
             key_ctrl_p => try state.editHistoryNext(.prev),
@@ -123,8 +122,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
                 utf8_buf[0] = c;
                 if ((try in.read(utf8_buf[1..utf8_len])) < utf8_len - 1) return null;
 
-                const codepoint = std.unicode.utf8Decode(utf8_buf[0..utf8_len]) catch continue;
-                try state.editInsert(codepoint);
+                try state.editInsert(utf8_buf[0..utf8_len]);
             },
         }
     }

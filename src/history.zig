@@ -1,14 +1,10 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const ArrayList = std.ArrayList;
-
-const unicode = @import("unicode.zig");
-const toUtf8 = unicode.toUtf8;
-const fromUtf8 = unicode.fromUtf8;
+const ArrayListUnmanaged = std.ArrayListUnmanaged;
 
 pub const History = struct {
     allocator: *Allocator,
-    hist: ArrayList([]const u21),
+    hist: ArrayListUnmanaged([]const u8),
     current: usize,
 
     const Self = @This();
@@ -17,7 +13,7 @@ pub const History = struct {
     pub fn empty(allocator: *Allocator) Self {
         return Self{
             .allocator = allocator,
-            .hist = ArrayList([]const u21).init(allocator),
+            .hist = .{},
             .current = 0,
         };
     }
@@ -25,23 +21,15 @@ pub const History = struct {
     /// Deinitializes the history
     pub fn deinit(self: *Self) void {
         for (self.hist.items) |x| self.allocator.free(x);
-        self.hist.deinit();
+        self.hist.deinit(self.allocator);
     }
 
     /// Adds this line to the history. Does not take ownership of the line, but
     /// instead copies it
-    pub fn add(self: *Self, line: []const u21) !void {
-        if (self.hist.items.len < 1 or !std.mem.eql(u21, line, self.hist.items[self.hist.items.len - 1])) {
-            try self.hist.append(try self.allocator.dupe(u21, line));
+    pub fn add(self: *Self, line: []const u8) !void {
+        if (self.hist.items.len < 1 or !std.mem.eql(u8, line, self.hist.items[self.hist.items.len - 1])) {
+            try self.hist.append(self.allocator, try self.allocator.dupe(u8, line));
         }
-    }
-
-    /// Adds a UTF-8 encoded line
-    pub fn addUtf8(self: *Self, line: []const u8) !void {
-        const line_unicode = try fromUtf8(self.allocator, line);
-        defer self.allocator.free(line_unicode);
-
-        try self.add(line_unicode);
     }
 
     /// Removes the last item (newest item) of the history
@@ -58,8 +46,7 @@ pub const History = struct {
 
         var reader = file.reader();
         while (reader.readUntilDelimiterAlloc(self.allocator, '\n', max_line_len)) |line| {
-            defer self.allocator.free(line);
-            try self.hist.append(try fromUtf8(self.allocator, line));
+            try self.hist.append(self.allocator, line);
         } else |err| {
             switch (err) {
                 error.EndOfStream => return,
@@ -74,9 +61,7 @@ pub const History = struct {
         defer file.close();
 
         for (self.hist.items) |line| {
-            const line_utf8 = try toUtf8(self.allocator, line);
-            defer self.allocator.free(line_utf8);
-            try file.writeAll(line_utf8);
+            try file.writeAll(line);
 
             try file.writeAll("\n");
         }
@@ -87,6 +72,6 @@ test "history" {
     var hist = History.empty(std.testing.allocator);
     defer hist.deinit();
 
-    try hist.add(&[_]u21{ 'H', 'e', 'l', 'l', 'o' });
+    try hist.add("Hello");
     hist.pop();
 }
