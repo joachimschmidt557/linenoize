@@ -28,7 +28,7 @@ pub fn main() !void {
 
     while (try ln.linenoise("hello> ")) |input| {
         defer allocator.free(input);
-        std.debug.warn("input: {}\n", .{input});
+        std.debug.print("input: {s}\n", .{input});
         try ln.history.add(input);
     }
 }
@@ -71,8 +71,8 @@ pub fn main() !void {
     defer ln.deinit();
 
     // Load history and save history later
-    ln.history.load("history.txt") catch std.debug.warn("Failed to load history\n", .{});
-    defer ln.history.save("history.txt") catch std.debug.warn("Failed to save history\n", .{});
+    ln.history.load("history.txt") catch std.debug.print("Failed to load history\n", .{});
+    defer ln.history.save("history.txt") catch std.debug.print("Failed to save history\n", .{});
 
     // Set up hints callback
     ln.hints_callback = hints;
@@ -88,7 +88,7 @@ pub fn main() !void {
 
     while (try ln.linenoise("hello> ")) |input| {
         defer allocator.free(input);
-        std.debug.warn("input: {}\n", .{input});
+        std.debug.print("input: {s}\n", .{input});
         try ln.history.add(input);
     }
 }
