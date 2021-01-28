@@ -49,7 +49,7 @@ pub fn main() !void {
 
     while (try ln.linenoise("hellö> ")) |input| {
         defer allocator.free(input);
-        std.debug.warn("input: {}\n", .{input});
+        std.debug.warn("input: {s}\n", .{input});
         try ln.history.add(input);
     }
 }
