@@ -154,11 +154,21 @@ pub const LinenoiseState = struct {
         const hint = try self.getHint();
         defer if (hint) |str| self.allocator.free(str);
 
-        // Trim buffer if it is too long
+        // Calculate widths
+        const pos = width(self.buf.items[0..self.pos]);
         const prompt_width = width(self.prompt);
         const hint_width = if (hint) |str| width(str) else 0;
-        const avail_space = self.cols - prompt_width - hint_width - 1;
-        const start = if (self.pos > avail_space) self.pos - avail_space else 0;
+        const buf_width = width(self.buf.items);
+
+        // Don't show hint/prompt when there is no space
+        const show_hint = prompt_width + hint_width < self.cols;
+        const show_prompt = prompt_width < self.cols;
+        const display_hint_width = if (show_hint) hint_width else 0;
+        const display_prompt_width = if (show_hint) prompt_width else 0;
+
+        // Trim buffer if it is too long
+        const avail_space = self.cols - display_prompt_width - display_hint_width - 1;
+        const start = if (pos > avail_space) pos - avail_space else 0;
         const end = if (start + avail_space < self.buf.items.len) start + avail_space else self.buf.items.len;
         const trimmed_buf = self.buf.items[start..end];
 
@@ -166,7 +176,7 @@ pub const LinenoiseState = struct {
         try writer.writeAll("\r");
 
         // Write prompt
-        try writer.writeAll(self.prompt);
+        if (show_prompt) try writer.writeAll(self.prompt);
 
         // Write current buffer content
         if (self.ln.mask_mode) {
@@ -178,16 +188,18 @@ pub const LinenoiseState = struct {
         }
 
         // Show hints
-        if (hint) |str| {
-            try writer.writeAll(str);
+        if (show_hint) {
+            if (hint) |str| {
+                try writer.writeAll(str);
+            }
         }
 
         // Erase to the right
         try writer.writeAll("\x1b[0K");
 
         // Move cursor to original position
-        const pos = if (self.pos > avail_space) self.cols - hint_width - 1 else prompt_width + self.pos;
-        try writer.print("\r\x1b[{}C", .{pos});
+        const cursor_pos = if (pos > avail_space) self.cols - display_hint_width - 1 else display_prompt_width + pos;
+        try writer.print("\r\x1b[{}C", .{cursor_pos});
 
         // Write buffer
         try buf.flush();
@@ -200,6 +212,7 @@ pub const LinenoiseState = struct {
         const hint = try self.getHint();
         defer if (hint) |str| self.allocator.free(str);
 
+        const pos = width(self.buf.items[0..self.pos]);
         const prompt_width = width(self.prompt);
         const hint_width = if (hint) |str| width(str) else 0;
         const total_width = prompt_width + self.buf.items.len + hint_width;
