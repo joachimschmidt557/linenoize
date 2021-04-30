@@ -36,7 +36,7 @@ const key_backspace = 127;
 
 fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
     var state = LinenoiseState.init(ln, in, out, prompt);
-    defer state.buf.deinit();
+    defer state.buf.deinit(state.allocator);
 
     try state.ln.history.add("");
     state.ln.history.current = state.ln.history.hist.items.len - 1;

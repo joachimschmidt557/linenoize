@@ -1,6 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
+const ArrayListUnmanaged = std.ArrayListUnmanaged;
 const File = std.fs.File;
 const bufferedWriter = std.io.bufferedWriter;
 
@@ -20,7 +21,7 @@ pub const LinenoiseState = struct {
 
     stdin: File,
     stdout: File,
-    buf: ArrayList(u8),
+    buf: ArrayListUnmanaged(u8),
     prompt: []const u8,
     pos: usize,
     old_pos: usize,
@@ -38,7 +39,7 @@ pub const LinenoiseState = struct {
             .stdin = in,
             .stdout = out,
             .prompt = prompt,
-            .buf = ArrayList(u8).init(ln.allocator),
+            .buf = .{},
             .pos = 0,
             .old_pos = 0,
             .size = 0,
@@ -78,22 +79,19 @@ pub const LinenoiseState = struct {
                 if (i < completions.len) {
                     // Change to completion nr. i
                     // First, save buffer so we can restore it later
-                    const old_buf_allocator = self.buf.allocator;
-                    const old_buf = self.buf.toOwnedSlice();
+                    const old_buf = self.buf.toOwnedSlice(self.allocator);
                     const old_pos = self.pos;
 
                     // Show suggested completion
-                    self.buf.deinit();
-                    self.buf = ArrayList(u8).init(old_buf_allocator);
-
-                    try self.buf.appendSlice(completions[i]);
-
+                    self.buf = .{};
+                    try self.buf.appendSlice(self.allocator, completions[i]);
                     self.pos = self.buf.items.len;
+
                     try self.refreshLine();
 
                     // Restore original buffer into state
-                    self.buf.deinit();
-                    self.buf = ArrayList(u8).fromOwnedSlice(old_buf_allocator, old_buf);
+                    self.buf.deinit(self.allocator);
+                    self.buf = ArrayList(u8).fromOwnedSlice(self.allocator, old_buf).toUnmanaged();
                     self.pos = old_pos;
                 } else {
                     // Return to original line
@@ -122,11 +120,9 @@ pub const LinenoiseState = struct {
                         if (i < completions.len) {
                             // Replace buffer with text in the selected
                             // completion
-                            const old_buf_allocator = self.buf.allocator;
-                            self.buf.deinit();
-                            self.buf = ArrayList(u8).init(old_buf_allocator);
-
-                            try self.buf.appendSlice(completions[i]);
+                            self.buf.deinit(self.allocator);
+                            self.buf = .{};
+                            try self.buf.appendSlice(self.allocator, completions[i]);
 
                             self.pos = self.buf.items.len;
                         }
@@ -296,7 +292,7 @@ pub const LinenoiseState = struct {
     }
 
     pub fn editInsert(self: *Self, c: []const u8) !void {
-        try self.buf.resize(self.buf.items.len + c.len);
+        try self.buf.resize(self.allocator, self.buf.items.len + c.len);
         if (self.buf.items.len > 0 and self.pos < self.buf.items.len - c.len) {
             std.mem.copyBackwards(
                 u8,
@@ -397,9 +393,9 @@ pub const LinenoiseState = struct {
             self.ln.history.current = new_index;
 
             // Copy history entry to the current line buffer
-            self.buf.deinit();
-            self.buf = ArrayList(u8).init(self.allocator);
-            try self.buf.appendSlice(self.ln.history.hist.items[new_index]);
+            self.buf.deinit(self.allocator);
+            self.buf = .{};
+            try self.buf.appendSlice(self.allocator, self.ln.history.hist.items[new_index]);
             self.pos = self.buf.items.len;
 
             try self.refreshLine();
@@ -410,7 +406,7 @@ pub const LinenoiseState = struct {
         if (self.buf.items.len > 0 and self.pos < self.buf.items.len) {
             const utf8_len = std.unicode.utf8CodepointSequenceLength(self.buf.items[self.pos]) catch 1;
             std.mem.copy(u8, self.buf.items[self.pos..], self.buf.items[self.pos + utf8_len ..]);
-            try self.buf.resize(self.buf.items.len - utf8_len);
+            try self.buf.resize(self.allocator, self.buf.items.len - utf8_len);
             try self.refreshLine();
         }
     }
@@ -421,7 +417,7 @@ pub const LinenoiseState = struct {
         const len = self.prevCodepointLen(self.pos);
         std.mem.copy(u8, self.buf.items[self.pos - len ..], self.buf.items[self.pos..]);
         self.pos -= len;
-        try self.buf.resize(self.buf.items.len - len);
+        try self.buf.resize(self.allocator, self.buf.items.len - len);
         try self.refreshLine();
     }
 
@@ -449,13 +445,13 @@ pub const LinenoiseState = struct {
             const diff = old_pos - self.pos;
             const new_len = self.buf.items.len - diff;
             std.mem.copy(u8, self.buf.items[self.pos..new_len], self.buf.items[old_pos..]);
-            try self.buf.resize(new_len);
+            try self.buf.resize(self.allocator, new_len);
             try self.refreshLine();
         }
     }
 
     pub fn editKillLineForward(self: *Self) !void {
-        try self.buf.resize(self.pos);
+        try self.buf.resize(self.allocator, self.pos);
         try self.refreshLine();
     }
 
@@ -463,7 +459,7 @@ pub const LinenoiseState = struct {
         const new_len = self.buf.items.len - self.pos;
         std.mem.copy(u8, self.buf.items, self.buf.items[self.pos..]);
         self.pos = 0;
-        try self.buf.resize(new_len);
+        try self.buf.resize(self.allocator, new_len);
         try self.refreshLine();
     }
 };
