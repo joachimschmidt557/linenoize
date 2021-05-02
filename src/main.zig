@@ -40,7 +40,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
 
     try state.ln.history.add("");
     state.ln.history.current = state.ln.history.hist.items.len - 1;
-    try state.stdout.writeAll(prompt);
+    try state.refreshLine();
 
     while (true) {
         var input_buf: [1]u8 = undefined;

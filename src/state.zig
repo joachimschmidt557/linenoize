@@ -4,6 +4,7 @@ const ArrayList = std.ArrayList;
 const ArrayListUnmanaged = std.ArrayListUnmanaged;
 const File = std.fs.File;
 const bufferedWriter = std.io.bufferedWriter;
+const math = std.math;
 
 const Linenoise = @import("main.zig").Linenoise;
 const History = @import("history.zig").History;
@@ -14,6 +15,107 @@ const getColumns = term.getColumns;
 
 const key_tab = 9;
 const key_esc = 27;
+
+const Bias = enum {
+    left,
+    right,
+};
+
+fn binarySearchBestEffort(
+    comptime T: type,
+    key: T,
+    items: []const T,
+    context: anytype,
+    comptime compareFn: fn (context: @TypeOf(context), lhs: T, rhs: T) math.Order,
+    bias: Bias,
+) usize {
+    var left: usize = 0;
+    var right: usize = items.len;
+
+    while (left < right) {
+        // Avoid overflowing in the midpoint calculation
+        const mid = left + (right - left) / 2;
+        // Compare the key with the midpoint element
+        switch (compareFn(context, key, items[mid])) {
+            .eq => return mid,
+            .gt => left = mid + 1,
+            .lt => right = mid,
+        }
+    }
+
+    // At this point, it is guaranteed that left >= right. In order
+    // for the bias to work, we need to return the exact opposite
+    return switch(bias) {
+        .left => right,
+        .right => left,
+    };
+}
+
+fn compareLeft(context: []const u8, avail_space: usize, index: usize) math.Order {
+    const width_slice = width(context[0..index]);
+    return math.order(avail_space, width_slice);
+}
+
+fn compareRight(context: []const u8, avail_space: usize, index: usize) math.Order {
+    const width_slice = width(context[index..]);
+    return math.order(width_slice, avail_space);
+}
+
+const StartOrEnd = enum {
+    start,
+    end,
+};
+
+/// Start mode: Calculates the optimal start position such that
+/// buf[start..] fits in the available space taking into account
+/// unicode codepoint widths
+///
+/// xxxxxxxxxxxxxxxxxxxxxxx buf
+///    [------------------] available_space
+///    ^                    start
+///
+/// End mode: Calculates the optimal end position so that buf[0..end]
+/// fits
+///
+/// xxxxxxxxxxxxxxxxxxxxxxx buf
+/// [----------]            available_space
+///            ^            end
+fn calculateStartOrEnd(
+    allocator: *Allocator,
+    comptime mode: StartOrEnd,
+    buf: []const u8,
+    avail_space: usize,
+) !usize {
+    // Create a mapping from unicode codepoint indices to buf
+    // indices
+    var map = try std.ArrayListUnmanaged(usize).initCapacity(allocator, buf.len);
+    defer map.deinit(allocator);
+
+    var utf8 = (try std.unicode.Utf8View.init(buf)).iterator();
+    while (utf8.nextCodepointSlice()) |codepoint| {
+        map.appendAssumeCapacity(@ptrToInt(codepoint.ptr) - @ptrToInt(buf.ptr));
+    }
+
+    const codepoint_start = binarySearchBestEffort(
+        usize,
+        avail_space,
+        map.items,
+        buf,
+        switch (mode) {
+            .start => compareRight,
+            .end => compareLeft,
+        },
+        // When calculating start or end, if in doubt, choose a
+        // smaller buffer as we don't want to overflow the line. For
+        // calculating start, this means that we would rather have an
+        // index more to the right.
+        switch (mode) {
+            .start => .right,
+            .end => .left,
+        },
+    );
+    return map.items[codepoint_start];
+}
 
 pub const LinenoiseState = struct {
     allocator: *Allocator,
@@ -157,16 +259,39 @@ pub const LinenoiseState = struct {
         const buf_width = width(self.buf.items);
 
         // Don't show hint/prompt when there is no space
-        const show_hint = prompt_width + hint_width < self.cols;
         const show_prompt = prompt_width < self.cols;
+        const display_prompt_width = if (show_prompt) prompt_width else 0;
+        const show_hint = display_prompt_width + hint_width < self.cols;
         const display_hint_width = if (show_hint) hint_width else 0;
-        const display_prompt_width = if (show_hint) prompt_width else 0;
 
-        // Trim buffer if it is too long
+        // buffer -> display_buf mapping
         const avail_space = self.cols - display_prompt_width - display_hint_width - 1;
-        const start = if (pos > avail_space) pos - avail_space else 0;
-        const end = if (start + avail_space < self.buf.items.len) start + avail_space else self.buf.items.len;
-        const trimmed_buf = self.buf.items[start..end];
+        const whole_buffer_fits = buf_width <= avail_space;
+        var start: usize = undefined;
+        var end: usize = undefined;
+        if (whole_buffer_fits) {
+            start = 0;
+            end = self.buf.items.len;
+        } else {
+            if (pos < avail_space) {
+                start = 0;
+                end = try calculateStartOrEnd(
+                    self.allocator,
+                    .end,
+                    self.buf.items,
+                    avail_space,
+                );
+            } else {
+                end = self.pos;
+                start = try calculateStartOrEnd(
+                    self.allocator,
+                    .start,
+                    self.buf.items[0..end],
+                    avail_space,
+                );
+            }
+        }
+        const display_buf = self.buf.items[start..end];
 
         // Move cursor to left edge
         try writer.writeAll("\r");
@@ -176,11 +301,11 @@ pub const LinenoiseState = struct {
 
         // Write current buffer content
         if (self.ln.mask_mode) {
-            for (trimmed_buf) |_| {
+            for (display_buf) |_| {
                 try writer.writeAll("*");
             }
         } else {
-            try writer.writeAll(trimmed_buf);
+            try writer.writeAll(display_buf);
         }
 
         // Show hints
@@ -332,7 +457,7 @@ pub const LinenoiseState = struct {
 
     pub fn editMoveRight(self: *Self) !void {
         if (self.pos < self.buf.items.len) {
-            const utf8_len = std.unicode.utf8CodepointSequenceLength(self.buf.items[self.pos]) catch 1;
+            const utf8_len = std.unicode.utf8ByteSequenceLength(self.buf.items[self.pos]) catch 1;
             self.pos += utf8_len;
             try self.refreshLine();
         }
