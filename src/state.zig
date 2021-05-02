@@ -45,7 +45,7 @@ fn binarySearchBestEffort(
 
     // At this point, it is guaranteed that left >= right. In order
     // for the bias to work, we need to return the exact opposite
-    return switch(bias) {
+    return switch (bias) {
         .left => right,
         .right => left,
     };
