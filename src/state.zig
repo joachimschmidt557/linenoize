@@ -333,27 +333,30 @@ pub const LinenoiseState = struct {
         const hint = try self.getHint();
         defer if (hint) |str| self.allocator.free(str);
 
+        // Calculate widths
         const pos = width(self.buf.items[0..self.pos]);
         const prompt_width = width(self.prompt);
         const hint_width = if (hint) |str| width(str) else 0;
-        const total_width = prompt_width + self.buf.items.len + hint_width;
+        const buf_width = width(self.buf.items);
+        const total_width = prompt_width + buf_width + hint_width;
+
         var rows = (total_width + self.cols - 1) / self.cols;
-        var rpos = (prompt_width + self.old_pos + self.cols) / self.cols;
-        const old_rows = self.max_rows;
+        const old_rpos = (prompt_width + self.old_pos + self.cols) / self.cols;
+        const old_max_rows = self.max_rows;
 
         if (rows > self.max_rows) {
             self.max_rows = rows;
         }
 
         // Go to the last row
-        if (old_rows > rpos) {
-            try writer.print("\x1B[{}B", .{old_rows - rpos});
+        if (old_max_rows > old_rpos) {
+            try writer.print("\x1B[{}B", .{old_max_rows - old_rpos});
         }
 
-        // Clear every row
-        if (old_rows > 0) {
+        // Clear every row from bottom to top
+        if (old_max_rows > 0) {
             var j: usize = 0;
-            while (j < old_rows - 1) : (j += 1) {
+            while (j < old_max_rows - 1) : (j += 1) {
                 try writer.writeAll("\r\x1B[0K\x1B[1A");
             }
         }
@@ -388,22 +391,22 @@ pub const LinenoiseState = struct {
         }
 
         // Move cursor to right position:
-        const rpos2 = (prompt_width + self.pos + self.cols) / self.cols;
+        const rpos = (prompt_width + pos + self.cols) / self.cols;
 
-        // First, y position
-        if (rows > rpos2) {
-            try writer.print("\x1B[{}A", .{rows - rpos2});
+        // First, y position (move up if necessary)
+        if (rows > rpos) {
+            try writer.print("\x1B[{}A", .{rows - rpos});
         }
 
-        // Then, x position
-        const col = (prompt_width + self.pos) % self.cols;
+        // Then, x position (move right if necessary)
+        const col = (prompt_width + pos) % self.cols;
         if (col > 0) {
             try writer.print("\r\x1B[{}C", .{col});
         } else {
             try writer.writeAll("\r");
         }
 
-        self.old_pos = self.pos;
+        self.old_pos = pos;
 
         try buf.flush();
     }
