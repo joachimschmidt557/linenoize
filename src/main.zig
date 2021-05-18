@@ -12,7 +12,7 @@ const disableRawMode = term.disableRawMode;
 const getColumns = term.getColumns;
 
 pub const HintsCallback = (fn (*Allocator, []const u8) Allocator.Error!?[]const u8);
-pub const CompletionsCallback = (fn (*Allocator, []const u8) Allocator.Error![][]const u8);
+pub const CompletionsCallback = (fn (*Allocator, []const u8) Allocator.Error![]const []const u8);
 
 const key_null = 0;
 const key_ctrl_a = 1;
@@ -70,7 +70,10 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
             key_ctrl_e => try state.editMoveEnd(),
             key_ctrl_f => try state.editMoveRight(),
             key_ctrl_k => try state.editKillLineForward(),
-            key_ctrl_l => try state.clearScreen(),
+            key_ctrl_l => {
+                try term.clearScreen();
+                try state.refreshLine();
+            },
             key_enter => {
                 state.ln.history.pop();
                 return try ln.allocator.dupe(u8, state.buf.items);

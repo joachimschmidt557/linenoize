@@ -150,16 +150,6 @@ pub const LinenoiseState = struct {
         };
     }
 
-    pub fn clearScreen(self: *Self) !void {
-        try self.stdout.writeAll("\x1b[H\x1b[2J");
-        try self.refreshLine();
-    }
-
-    pub fn beep(self: *Self) !void {
-        const stderr = std.io.getStdErr();
-        try stderr.writeAll("\x07");
-    }
-
     pub fn browseCompletions(self: *Self) !?u8 {
         var input_buf: [1]u8 = undefined;
         var c: ?u8 = null;
@@ -172,7 +162,7 @@ pub const LinenoiseState = struct {
         }
 
         if (completions.len == 0) {
-            try self.beep();
+            try term.beep();
         } else {
             var finished = false;
             var i: usize = 0;
@@ -208,7 +198,7 @@ pub const LinenoiseState = struct {
                     key_tab => {
                         // Next completion
                         i = (i + 1) % (completions.len + 1);
-                        if (i == completions.len) try self.beep();
+                        if (i == completions.len) try term.beep();
                     },
                     key_esc => {
                         // Stop browsing completions, return to buffer displayed

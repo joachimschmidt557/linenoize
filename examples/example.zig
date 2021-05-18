@@ -6,7 +6,7 @@ const log = std.log.scoped(.main);
 
 const Linenoise = @import("linenoise").Linenoise;
 
-fn completion(allocator: *Allocator, buf: []const u8) ![][]const u8 {
+fn completion(allocator: *Allocator, buf: []const u8) ![]const []const u8 {
     if (std.mem.eql(u8, "z", buf)) {
         var result = ArrayList([]const u8).init(allocator);
         try result.append(try allocator.dupe(u8, "zig"));

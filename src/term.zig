@@ -86,3 +86,13 @@ pub fn getColumns(in: File, out: File) usize {
         return cols;
     }
 }
+
+pub fn clearScreen() !void {
+    const stdout = std.io.getStdErr();
+    try stdout.writeAll("\x1b[H\x1b[2J");
+}
+
+pub fn beep() !void {
+    const stderr = std.io.getStdErr();
+    try stderr.writeAll("\x07");
+}
