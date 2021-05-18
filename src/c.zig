@@ -77,7 +77,7 @@ fn completionsCallback(allocator: *Allocator, line: []const u8) ![]const []const
             for (completions) |*x, i| {
                 x.* = try allocator.dupe(u8, mem.spanZ(raw_completions[i]));
             }
-            
+
             return completions;
         }
     }
@@ -94,8 +94,12 @@ fn hintsCallback(allocator: *Allocator, line: []const u8) !?[]const u8 {
         var bold: c_int = 0;
         const maybe_hint = cHintsCallback(lineZ, &color, &bold);
         if (maybe_hint) |hintZ| {
-            defer c_free_hints_callback.?(hintZ);
-                
+            defer {
+                if (c_free_hints_callback) |cFreeHintsCallback| {
+                    cFreeHintsCallback(hintZ);
+                }
+            }
+
             const hint = mem.spanZ(hintZ);
             if (bold == 1 and color == -1) {
                 color = 37;
@@ -153,7 +157,7 @@ export fn linenoiseSetMultiLine(ml: c_int) void {
 }
 
 /// Not implemented in zig-linenoise
-export fn linenoisePrintKeys() void {}
+export fn linenoisePrintKeyCodes() void {}
 
 export fn linenoiseMaskModeEnable() void {
     global_linenoise.mask_mode = true;
