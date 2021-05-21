@@ -133,8 +133,8 @@ export fn linenoiseHistoryAdd(line: [*:0]const u8) c_int {
     return 0;
 }
 
-/// Not implemented in zig-linenoise
 export fn linenoiseHistorySetMaxLen(len: c_int) c_int {
+    global_linenoise.history.setMaxLen(@intCast(usize, len)) catch return -1;
     return 0;
 }
 
