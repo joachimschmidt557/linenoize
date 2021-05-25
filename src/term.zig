@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const File = std.fs.File;
 
 const unsupported_term = [_][]const u8{ "dumb", "cons25", "emacs" };
@@ -68,22 +69,30 @@ fn getCursorPosition(in: File, out: File) !usize {
     return try std.fmt.parseInt(usize, x, 10);
 }
 
+fn getColumnsFallback(in: File, out: File) usize {
+    var writer = out.writer();
+    const orig_cursor_pos = getCursorPosition(in, out) catch return 80;
+
+    writer.print("\x1B[999C", .{}) catch return 80;
+    const cols = getCursorPosition(in, out) catch return 80;
+
+    writer.print("\x1B[{}D", .{orig_cursor_pos}) catch return 80;
+
+    return cols;
+}
+
 pub fn getColumns(in: File, out: File) usize {
     var wsz: std.os.linux.winsize = undefined;
 
-    if (std.os.linux.syscall3(.ioctl, @bitCast(usize, @as(isize, in.handle)), std.os.linux.TIOCGWINSZ, @ptrToInt(&wsz)) == 0) {
-        return wsz.ws_col;
-    } else {
-        // ioctl() didn't work
-        var writer = out.writer();
-        const orig_cursor_pos = getCursorPosition(in, out) catch return 80;
-
-        writer.print("\x1B[999C", .{}) catch return 80;
-        const cols = getCursorPosition(in, out) catch return 80;
-
-        writer.print("\x1B[{}D", .{orig_cursor_pos}) catch return 80;
-
-        return cols;
+    switch (builtin.os.tag) {
+        .linux => {
+            if (std.os.linux.ioctl(in.handle, std.os.linux.TIOCGWINSZ, @ptrToInt(&wsz)) == 0) {
+                return wsz.ws_col;
+            } else {
+                return getColumnsFallback(in, out);
+            }
+        },
+        else => return getColumnsFallback(in, out),
     }
 }
 

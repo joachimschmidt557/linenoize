@@ -2,8 +2,12 @@
 
 A port of [linenoise](https://github.com/antirez/linenoise) to zig
 aiming to be a simple readline for command-line applications written
-in zig. It is written in pure zig and doesn't require libc. Currently,
-only linux is supported.
+in zig. It is written in pure zig and doesn't require libc.
+
+In addition to being a full-fledged zig library, `zig-linenoise` also
+serves as a drop-in replacement for linenoise. As a proof of concept,
+the example application from linenoise can be built with `zig build
+c-example`.
 
 ## Features
 
@@ -14,7 +18,16 @@ only linux is supported.
 - Multi line mode
 - Mask input mode
 
-## Minimal example
+### Supported platforms
+
+- Linux
+- macOS (Experimental)
+- TODO: Windows
+- TODO: FreeBSD
+
+## Examples
+
+### Minimal example
 
 ```zig
 const std = @import("std");
@@ -34,7 +47,7 @@ pub fn main() !void {
 }
 ```
 
-## Example of more features
+### Example of more features
 
 ``` zig
 const std = @import("std");
