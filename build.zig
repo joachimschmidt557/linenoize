@@ -12,7 +12,7 @@ pub fn build(b: *Builder) void {
     const mode = b.standardReleaseOptions();
 
     // Static library
-    const lib = b.addStaticLibrary("zig-linenoise", "src/c.zig");
+    const lib = b.addStaticLibrary("linenoise", "src/c.zig");
     lib.setTarget(target);
     lib.setBuildMode(mode);
     lib.linkLibC();

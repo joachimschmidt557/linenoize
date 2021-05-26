@@ -1,10 +1,10 @@
-# zig-linenoise
+# linenoize
 
 A port of [linenoise](https://github.com/antirez/linenoise) to zig
 aiming to be a simple readline for command-line applications written
 in zig. It is written in pure zig and doesn't require libc.
 
-In addition to being a full-fledged zig library, `zig-linenoise` also
+In addition to being a full-fledged zig library, `linenoize` also
 serves as a drop-in replacement for linenoise. As a proof of concept,
 the example application from linenoise can be built with `zig build
 c-example`.

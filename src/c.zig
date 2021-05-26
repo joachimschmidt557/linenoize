@@ -156,7 +156,7 @@ export fn linenoiseSetMultiLine(ml: c_int) void {
     global_linenoise.multiline_mode = ml != 0;
 }
 
-/// Not implemented in zig-linenoise
+/// Not implemented in linenoize
 export fn linenoisePrintKeyCodes() void {}
 
 export fn linenoiseMaskModeEnable() void {
