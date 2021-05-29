@@ -69,19 +69,19 @@ fn getCursorPosition(in: File, out: File) !usize {
     return try std.fmt.parseInt(usize, x, 10);
 }
 
-fn getColumnsFallback(in: File, out: File) usize {
+fn getColumnsFallback(in: File, out: File) !usize {
     var writer = out.writer();
-    const orig_cursor_pos = getCursorPosition(in, out) catch return 80;
+    const orig_cursor_pos = try getCursorPosition(in, out);
 
-    writer.print("\x1B[999C", .{}) catch return 80;
-    const cols = getCursorPosition(in, out) catch return 80;
+    try writer.print("\x1B[999C", .{});
+    const cols = try getCursorPosition(in, out);
 
-    writer.print("\x1B[{}D", .{orig_cursor_pos}) catch return 80;
+    try writer.print("\x1B[{}D", .{orig_cursor_pos});
 
     return cols;
 }
 
-pub fn getColumns(in: File, out: File) usize {
+pub fn getColumns(in: File, out: File) !usize {
     var wsz: std.os.linux.winsize = undefined;
 
     switch (builtin.os.tag) {
@@ -89,10 +89,10 @@ pub fn getColumns(in: File, out: File) usize {
             if (std.os.linux.ioctl(in.handle, std.os.linux.TIOCGWINSZ, @ptrToInt(&wsz)) == 0) {
                 return wsz.ws_col;
             } else {
-                return getColumnsFallback(in, out);
+                return try getColumnsFallback(in, out);
             }
         },
-        else => return getColumnsFallback(in, out),
+        else => return try getColumnsFallback(in, out),
     }
 }
 

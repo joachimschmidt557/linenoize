@@ -123,13 +123,12 @@ pub const LinenoiseState = struct {
 
     stdin: File,
     stdout: File,
-    buf: ArrayListUnmanaged(u8),
+    buf: ArrayListUnmanaged(u8) = .{},
     prompt: []const u8,
-    pos: usize,
-    old_pos: usize,
-    size: usize,
+    pos: usize = 0,
+    old_pos: usize = 0,
     cols: usize,
-    max_rows: usize,
+    max_rows: usize = 0,
 
     const Self = @This();
 
@@ -141,12 +140,7 @@ pub const LinenoiseState = struct {
             .stdin = in,
             .stdout = out,
             .prompt = prompt,
-            .buf = .{},
-            .pos = 0,
-            .old_pos = 0,
-            .size = 0,
-            .cols = getColumns(in, out),
-            .max_rows = 0,
+            .cols = getColumns(in, out) catch 80,
         };
     }
 
