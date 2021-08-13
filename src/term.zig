@@ -62,7 +62,7 @@ fn getCursorPosition(in: File, out: File) !usize {
     if (!std.mem.startsWith(u8, "\x1B[", answer))
         return error.CursorPos;
 
-    var iter = std.mem.split(answer[2..], ";");
+    var iter = std.mem.split(u8, answer[2..], ";");
     _ = iter.next() orelse return error.CursorPos;
     const x = iter.next() orelse return error.CursorPos;
     return try std.fmt.parseInt(usize, x, 10);
