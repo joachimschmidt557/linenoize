@@ -5,7 +5,7 @@ const ArrayListUnmanaged = std.ArrayListUnmanaged;
 const max_line_len = 4096;
 
 pub const History = struct {
-    allocator: *Allocator,
+    allocator: Allocator,
     hist: ArrayListUnmanaged([]const u8) = .{},
     max_len: usize = 100,
     current: usize = 0,
@@ -13,7 +13,7 @@ pub const History = struct {
     const Self = @This();
 
     /// Creates a new empty history
-    pub fn empty(allocator: *Allocator) Self {
+    pub fn empty(allocator: Allocator) Self {
         return Self{
             .allocator = allocator,
         };

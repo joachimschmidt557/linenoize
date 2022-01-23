@@ -11,8 +11,8 @@ const enableRawMode = term.enableRawMode;
 const disableRawMode = term.disableRawMode;
 const getColumns = term.getColumns;
 
-pub const HintsCallback = (fn (*Allocator, []const u8) Allocator.Error!?[]const u8);
-pub const CompletionsCallback = (fn (*Allocator, []const u8) Allocator.Error![]const []const u8);
+pub const HintsCallback = (fn (Allocator, []const u8) Allocator.Error!?[]const u8);
+pub const CompletionsCallback = (fn (Allocator, []const u8) Allocator.Error![]const []const u8);
 
 const key_null = 0;
 const key_ctrl_a = 1;
@@ -143,7 +143,7 @@ fn linenoiseRaw(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]con
 }
 
 /// Read a line with no special features (no hints, no completions, no history)
-fn linenoiseNoTTY(allocator: *Allocator, stdin: File) !?[]const u8 {
+fn linenoiseNoTTY(allocator: Allocator, stdin: File) !?[]const u8 {
     var reader = stdin.reader();
     const max_line_len = std.math.maxInt(usize);
     return reader.readUntilDelimiterAlloc(allocator, '\n', max_line_len) catch |e| switch (e) {
@@ -153,7 +153,7 @@ fn linenoiseNoTTY(allocator: *Allocator, stdin: File) !?[]const u8 {
 }
 
 pub const Linenoise = struct {
-    allocator: *Allocator,
+    allocator: Allocator,
     history: History,
     multiline_mode: bool,
     mask_mode: bool,
@@ -163,7 +163,7 @@ pub const Linenoise = struct {
     const Self = @This();
 
     /// Initialize a linenoise struct
-    pub fn init(allocator: *Allocator) Self {
+    pub fn init(allocator: Allocator) Self {
         return Self{
             .allocator = allocator,
             .history = History.empty(allocator),

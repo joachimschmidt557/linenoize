@@ -81,7 +81,7 @@ const StartOrEnd = enum {
 /// [----------]            available_space
 ///            ^            end
 fn calculateStartOrEnd(
-    allocator: *Allocator,
+    allocator: Allocator,
     comptime mode: StartOrEnd,
     buf: []const u8,
     avail_space: usize,
@@ -118,7 +118,7 @@ fn calculateStartOrEnd(
 }
 
 pub const LinenoiseState = struct {
-    allocator: *Allocator,
+    allocator: Allocator,
     ln: *Linenoise,
 
     stdin: File,
@@ -177,7 +177,7 @@ pub const LinenoiseState = struct {
 
                     // Restore original buffer into state
                     self.buf.deinit(self.allocator);
-                    self.buf = ArrayList(u8).fromOwnedSlice(self.allocator, old_buf).toUnmanaged();
+                    self.buf = ArrayList(u8).fromOwnedSlice(self.allocator, old_buf).moveToUnmanaged();
                     self.pos = old_pos;
                 } else {
                     // Return to original line

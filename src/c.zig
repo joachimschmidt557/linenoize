@@ -21,14 +21,14 @@ const LinenoiseCompletions = extern struct {
         if (self.cvec) |raw_completions| {
             const len = @intCast(usize, self.len);
             for (raw_completions[0..len]) |x| std.c.free(x);
-            std.c.free(@ptrCast(*c_void, raw_completions));
+            std.c.free(@ptrCast(*anyopaque, raw_completions));
         }
     }
 };
 
 const linenoiseCompletionCallback = fn ([*:0]const u8, *LinenoiseCompletions) callconv(.C) void;
 const linenoiseHintsCallback = fn ([*:0]const u8, *c_int, *c_int) callconv(.C) ?[*:0]u8;
-const linenoiseFreeHintsCallback = fn (*c_void) callconv(.C) void;
+const linenoiseFreeHintsCallback = fn (*anyopaque) callconv(.C) void;
 
 export fn linenoiseSetCompletionCallback(fun: linenoiseCompletionCallback) void {
     c_completion_callback = fun;
@@ -45,7 +45,7 @@ export fn linenoiseSetFreeHintsCallback(fun: linenoiseFreeHintsCallback) void {
 }
 
 export fn linenoiseAddCompletion(lc: *LinenoiseCompletions, str: [*:0]const u8) void {
-    const dupe = global_allocator.dupeZ(u8, mem.spanZ(str)) catch return;
+    const dupe = global_allocator.dupeZ(u8, mem.span(str)) catch return;
 
     var completions: std.ArrayList([*:0]u8) = undefined;
     if (lc.cvec) |raw_completions| {
@@ -59,7 +59,7 @@ export fn linenoiseAddCompletion(lc: *LinenoiseCompletions, str: [*:0]const u8) 
     lc.len += 1;
 }
 
-fn completionsCallback(allocator: *Allocator, line: []const u8) ![]const []const u8 {
+fn completionsCallback(allocator: Allocator, line: []const u8) ![]const []const u8 {
     if (c_completion_callback) |cCompletionCallback| {
         const lineZ = try allocator.dupeZ(u8, line);
         defer allocator.free(lineZ);
@@ -75,7 +75,7 @@ fn completionsCallback(allocator: *Allocator, line: []const u8) ![]const []const
 
             const completions = try allocator.alloc([]const u8, lc.len);
             for (completions) |*x, i| {
-                x.* = try allocator.dupe(u8, mem.spanZ(raw_completions[i]));
+                x.* = try allocator.dupe(u8, mem.span(raw_completions[i]));
             }
 
             return completions;
@@ -85,7 +85,7 @@ fn completionsCallback(allocator: *Allocator, line: []const u8) ![]const []const
     return &[_][]const u8{};
 }
 
-fn hintsCallback(allocator: *Allocator, line: []const u8) !?[]const u8 {
+fn hintsCallback(allocator: Allocator, line: []const u8) !?[]const u8 {
     if (c_hints_callback) |cHintsCallback| {
         const lineZ = try allocator.dupeZ(u8, line);
         defer allocator.free(lineZ);
@@ -100,7 +100,7 @@ fn hintsCallback(allocator: *Allocator, line: []const u8) !?[]const u8 {
                 }
             }
 
-            const hint = mem.spanZ(hintZ);
+            const hint = mem.span(hintZ);
             if (bold == 1 and color == -1) {
                 color = 37;
             }
@@ -117,19 +117,19 @@ fn hintsCallback(allocator: *Allocator, line: []const u8) !?[]const u8 {
 }
 
 export fn linenoise(prompt: [*:0]const u8) ?[*:0]u8 {
-    const result = global_linenoise.linenoise(mem.spanZ(prompt)) catch return null;
+    const result = global_linenoise.linenoise(mem.span(prompt)) catch return null;
     if (result) |line| {
         defer global_allocator.free(line);
         return global_allocator.dupeZ(u8, line) catch return null;
     } else return null;
 }
 
-export fn linenoiseFree(ptr: *c_void) void {
+export fn linenoiseFree(ptr: *anyopaque) void {
     std.c.free(ptr);
 }
 
 export fn linenoiseHistoryAdd(line: [*:0]const u8) c_int {
-    global_linenoise.history.add(mem.spanZ(line)) catch return -1;
+    global_linenoise.history.add(mem.span(line)) catch return -1;
     return 0;
 }
 
@@ -139,12 +139,12 @@ export fn linenoiseHistorySetMaxLen(len: c_int) c_int {
 }
 
 export fn linenoiseHistorySave(filename: [*:0]const u8) c_int {
-    global_linenoise.history.save(mem.spanZ(filename)) catch return -1;
+    global_linenoise.history.save(mem.span(filename)) catch return -1;
     return 0;
 }
 
 export fn linenoiseHistoryLoad(filename: [*:0]const u8) c_int {
-    global_linenoise.history.load(mem.spanZ(filename)) catch return -1;
+    global_linenoise.history.load(mem.span(filename)) catch return -1;
     return 0;
 }
 

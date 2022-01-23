@@ -2,6 +2,8 @@ const std = @import("std");
 const builtin = @import("builtin");
 const File = std.fs.File;
 
+const tcflag_t = std.os.tcflag_t;
+
 const unsupported_term = [_][]const u8{ "dumb", "cons25", "emacs" };
 
 pub fn isUnsupportedTerm() bool {
@@ -17,22 +19,21 @@ pub fn enableRawMode(fd: File) !std.os.termios {
     const orig = try std.os.tcgetattr(fd.handle);
     var raw = orig;
 
-    const tcflag_t = std.os.tcflag_t;
+    // TODO fix hardcoding of linux
+    raw.iflag &= ~(@intCast(tcflag_t, std.os.linux.BRKINT) |
+        @intCast(tcflag_t, std.os.linux.ICRNL) |
+        @intCast(tcflag_t, std.os.linux.INPCK) |
+        @intCast(tcflag_t, std.os.linux.ISTRIP) |
+        @intCast(tcflag_t, std.os.linux.IXON));
 
-    raw.iflag &= ~(@intCast(tcflag_t, std.os.BRKINT) |
-        @intCast(tcflag_t, std.os.ICRNL) |
-        @intCast(tcflag_t, std.os.INPCK) |
-        @intCast(tcflag_t, std.os.ISTRIP) |
-        @intCast(tcflag_t, std.os.IXON));
+    raw.oflag &= ~(@intCast(tcflag_t, std.os.linux.OPOST));
 
-    raw.oflag &= ~(@intCast(tcflag_t, std.os.OPOST));
+    raw.cflag |= (@intCast(tcflag_t, std.os.linux.CS8));
 
-    raw.cflag |= (@intCast(tcflag_t, std.os.CS8));
-
-    raw.lflag &= ~(@intCast(tcflag_t, std.os.ECHO) |
-        @intCast(tcflag_t, std.os.ICANON) |
-        @intCast(tcflag_t, std.os.IEXTEN) |
-        @intCast(tcflag_t, std.os.ISIG));
+    raw.lflag &= ~(@intCast(tcflag_t, std.os.linux.ECHO) |
+        @intCast(tcflag_t, std.os.linux.ICANON) |
+        @intCast(tcflag_t, std.os.linux.IEXTEN) |
+        @intCast(tcflag_t, std.os.linux.ISIG));
 
     // FIXME
     // raw.cc[std.os.VMIN] = 1;
@@ -65,6 +66,7 @@ fn getCursorPosition(in: File, out: File) !usize {
     var iter = std.mem.split(u8, answer[2..], ";");
     _ = iter.next() orelse return error.CursorPos;
     const x = iter.next() orelse return error.CursorPos;
+
     return try std.fmt.parseInt(usize, x, 10);
 }
 
@@ -81,11 +83,10 @@ fn getColumnsFallback(in: File, out: File) !usize {
 }
 
 pub fn getColumns(in: File, out: File) !usize {
-    var wsz: std.os.linux.winsize = undefined;
-
     switch (builtin.os.tag) {
         .linux => {
-            if (std.os.linux.ioctl(in.handle, std.os.linux.TIOCGWINSZ, @ptrToInt(&wsz)) == 0) {
+            var wsz: std.os.linux.winsize = undefined;
+            if (std.os.linux.ioctl(in.handle, std.os.linux.T.IOCGWINSZ, @ptrToInt(&wsz)) == 0) {
                 return wsz.ws_col;
             } else {
                 return try getColumnsFallback(in, out);
