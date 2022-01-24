@@ -6,7 +6,7 @@ const Allocator = mem.Allocator;
 const Linenoise = @import("main.zig").Linenoise;
 const term = @import("term.zig");
 
-const global_allocator = std.heap.raw_c_allocator;
+const global_allocator = std.heap.c_allocator;
 var global_linenoise = Linenoise.init(global_allocator);
 
 var c_completion_callback: ?linenoiseCompletionCallback = null;
@@ -20,8 +20,8 @@ const LinenoiseCompletions = extern struct {
     pub fn free(self: *LinenoiseCompletions) void {
         if (self.cvec) |raw_completions| {
             const len = @intCast(usize, self.len);
-            for (raw_completions[0..len]) |x| std.c.free(x);
-            std.c.free(@ptrCast(*anyopaque, raw_completions));
+            for (raw_completions[0..len]) |x| global_allocator.free(mem.span(x));
+            global_allocator.free(raw_completions[0..len]);
         }
     }
 };
@@ -125,7 +125,7 @@ export fn linenoise(prompt: [*:0]const u8) ?[*:0]u8 {
 }
 
 export fn linenoiseFree(ptr: *anyopaque) void {
-    std.c.free(ptr);
+    global_allocator.free(mem.span(@ptrCast([*:0]const u8, ptr)));
 }
 
 export fn linenoiseHistoryAdd(line: [*:0]const u8) c_int {
