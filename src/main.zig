@@ -155,10 +155,10 @@ fn linenoiseNoTTY(allocator: Allocator, stdin: File) !?[]const u8 {
 pub const Linenoise = struct {
     allocator: Allocator,
     history: History,
-    multiline_mode: bool,
-    mask_mode: bool,
-    hints_callback: ?HintsCallback,
-    completions_callback: ?CompletionsCallback,
+    multiline_mode: bool = false,
+    mask_mode: bool = false,
+    hints_callback: ?HintsCallback = null,
+    completions_callback: ?CompletionsCallback = null,
 
     const Self = @This();
 
@@ -167,10 +167,6 @@ pub const Linenoise = struct {
         return Self{
             .allocator = allocator,
             .history = History.empty(allocator),
-            .mask_mode = false,
-            .multiline_mode = false,
-            .hints_callback = null,
-            .completions_callback = null,
         };
     }
 
