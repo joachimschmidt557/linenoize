@@ -157,6 +157,8 @@ pub const Linenoise = struct {
     history: History,
     multiline_mode: bool = false,
     mask_mode: bool = false,
+    is_tty: bool = false,
+    term_supported: bool = false,
     hints_callback: ?HintsCallback = null,
     completions_callback: ?CompletionsCallback = null,
 
@@ -164,10 +166,12 @@ pub const Linenoise = struct {
 
     /// Initialize a linenoise struct
     pub fn init(allocator: Allocator) Self {
-        return Self{
+        var self = Self{
             .allocator = allocator,
             .history = History.empty(allocator),
         };
+        self.examineStdIo();
+        return self;
     }
 
     /// Free all resources occupied by this struct
@@ -175,21 +179,28 @@ pub const Linenoise = struct {
         self.history.deinit();
     }
 
+    /// Re-examine (currently) stdin and environment variables to
+    /// check if line editing and prompt printing should be
+    /// enabled or not.
+    pub fn examineStdIo(self: *Self) void {
+        const stdin_file = std.io.getStdIn();
+        self.is_tty = stdin_file.isTty();
+        self.term_supported = !isUnsupportedTerm();
+    }
+
     /// Reads a line from the terminal. Caller owns returned memory
     pub fn linenoise(self: *Self, prompt: []const u8) !?[]const u8 {
         const stdin_file = std.io.getStdIn();
         const stdout_file = std.io.getStdOut();
 
-        if (stdin_file.isTty()) {
-            if (isUnsupportedTerm()) {
-                try stdout_file.writeAll(prompt);
-                return try linenoiseNoTTY(self.allocator, stdin_file);
-            } else {
-                return try linenoiseRaw(self, stdin_file, stdout_file, prompt);
-            }
-        } else {
-            return try linenoiseNoTTY(self.allocator, stdin_file);
+        if (self.is_tty and !self.term_supported) {
+            try stdout_file.writeAll(prompt);
         }
+
+        return if (self.is_tty and self.term_supported)
+            try linenoiseRaw(self, stdin_file, stdout_file, prompt)
+        else
+            try linenoiseNoTTY(self.allocator, stdin_file);
     }
 };
 
