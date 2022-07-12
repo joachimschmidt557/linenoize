@@ -18,9 +18,6 @@ pub fn build(b: *Builder) void {
     lib.linkLibC();
     lib.install();
 
-    const lib_step = b.step("library", "Build static library");
-    lib_step.dependOn(&lib.step);
-
     // Tests
     var main_tests = b.addTest("src/main.zig");
     main_tests.setTarget(target);
