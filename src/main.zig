@@ -11,8 +11,8 @@ const enableRawMode = term.enableRawMode;
 const disableRawMode = term.disableRawMode;
 const getColumns = term.getColumns;
 
-pub const HintsCallback = (fn (Allocator, []const u8) Allocator.Error!?[]const u8);
-pub const CompletionsCallback = (fn (Allocator, []const u8) Allocator.Error![]const []const u8);
+pub const HintsCallback = *fn (Allocator, []const u8) Allocator.Error!?[]const u8;
+pub const CompletionsCallback = *fn (Allocator, []const u8) Allocator.Error![]const []const u8;
 
 const key_null = 0;
 const key_ctrl_a = 1;
@@ -34,7 +34,7 @@ const key_ctrl_w = 23;
 const key_esc = 27;
 const key_backspace = 127;
 
-fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
+pub fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
     var state = LinenoiseState.init(ln, in, out, prompt);
     defer state.buf.deinit(state.allocator);
 
@@ -133,7 +133,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
 
 /// Read a line with custom line editing mechanics. This includes hints,
 /// completions and history
-fn linenoiseRaw(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
+pub fn linenoiseRaw(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
     defer out.writeAll("\n") catch {};
 
     const orig = try enableRawMode(in);
@@ -143,7 +143,7 @@ fn linenoiseRaw(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]con
 }
 
 /// Read a line with no special features (no hints, no completions, no history)
-fn linenoiseNoTTY(allocator: Allocator, stdin: File) !?[]const u8 {
+pub fn linenoiseNoTTY(allocator: Allocator, stdin: File) !?[]const u8 {
     var reader = stdin.reader();
     const max_line_len = std.math.maxInt(usize);
     return reader.readUntilDelimiterAlloc(allocator, '\n', max_line_len) catch |e| switch (e) {

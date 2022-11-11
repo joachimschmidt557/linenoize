@@ -177,7 +177,8 @@ pub const LinenoiseState = struct {
 
                     // Restore original buffer into state
                     self.buf.deinit(self.allocator);
-                    self.buf = ArrayList(u8).fromOwnedSlice(self.allocator, old_buf).moveToUnmanaged();
+                    var new_buf = ArrayList(u8).fromOwnedSlice(self.allocator, old_buf);
+                    self.buf = new_buf.moveToUnmanaged();
                     self.pos = old_pos;
                 } else {
                     // Return to original line
@@ -423,13 +424,13 @@ pub const LinenoiseState = struct {
     }
 
     fn prevCodepointLen(self: *Self, pos: usize) usize {
-        if (pos >= 1 and @clz(u8, ~self.buf.items[pos - 1]) == 0) {
+        if (pos >= 1 and @clz(~self.buf.items[pos - 1]) == 0) {
             return 1;
-        } else if (pos >= 2 and @clz(u8, ~self.buf.items[pos - 2]) == 2) {
+        } else if (pos >= 2 and @clz(~self.buf.items[pos - 2]) == 2) {
             return 2;
-        } else if (pos >= 3 and @clz(u8, ~self.buf.items[pos - 3]) == 3) {
+        } else if (pos >= 3 and @clz(~self.buf.items[pos - 3]) == 3) {
             return 3;
-        } else if (pos >= 4 and @clz(u8, ~self.buf.items[pos - 4]) == 4) {
+        } else if (pos >= 4 and @clz(~self.buf.items[pos - 4]) == 4) {
             return 4;
         } else {
             return 0;
