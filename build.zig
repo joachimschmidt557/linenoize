@@ -39,7 +39,7 @@ pub fn build(b: *Builder) void {
 
     // C example
     var c_example = b.addExecutable("example", "examples/example.c");
-    c_example.addIncludeDir("include");
+    c_example.addIncludePath("include");
     c_example.linkLibC();
     c_example.linkLibrary(lib);
     c_example.setTarget(target);
