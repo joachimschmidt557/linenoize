@@ -26,9 +26,9 @@ const LinenoiseCompletions = extern struct {
     }
 };
 
-const linenoiseCompletionCallback = fn ([*:0]const u8, *LinenoiseCompletions) callconv(.C) void;
-const linenoiseHintsCallback = fn ([*:0]const u8, *c_int, *c_int) callconv(.C) ?[*:0]u8;
-const linenoiseFreeHintsCallback = fn (*anyopaque) callconv(.C) void;
+const linenoiseCompletionCallback = std.meta.FnPtr(fn ([*:0]const u8, *LinenoiseCompletions) callconv(.C) void);
+const linenoiseHintsCallback = std.meta.FnPtr(fn ([*:0]const u8, *c_int, *c_int) callconv(.C) ?[*:0]u8);
+const linenoiseFreeHintsCallback = std.meta.FnPtr(fn (*anyopaque) callconv(.C) void);
 
 export fn linenoiseSetCompletionCallback(fun: linenoiseCompletionCallback) void {
     c_completion_callback = fun;
