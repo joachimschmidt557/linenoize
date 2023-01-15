@@ -91,11 +91,18 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
                     '[' => {
                         if ((try in.read(&input_buf)) < 1) return null;
                         switch (input_buf[0]) {
-                            '0'...'9' => {
-                                const num = input_buf[0];
+                            '0'...'9' => |num| {
                                 if ((try in.read(&input_buf)) < 1) return null;
-                                if (num == '3' and input_buf[0] == '~')
-                                    try state.editDelete();
+                                switch (input_buf[0]) {
+                                    '~' => switch (num) {
+                                        '1', '7' => try state.editMoveHome(),
+                                        '3' => try state.editDelete(),
+                                        '4', '8' => try state.editMoveEnd(),
+                                        else => {},
+                                    },
+                                    '0'...'9' => {}, // TODO: read 2-digit CSI
+                                    else => {},
+                                }
                             },
                             'A' => try state.editHistoryNext(.prev),
                             'B' => try state.editHistoryNext(.next),
