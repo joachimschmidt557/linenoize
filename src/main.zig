@@ -44,7 +44,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
 
     while (true) {
         var input_buf: [1]u8 = undefined;
-        if ((try in.read(&input_buf)) < 1) return null;
+        if ((try term.read(in, &input_buf)) < 1) return null;
         var c = input_buf[0];
 
         // Browse completions before editing
@@ -84,12 +84,12 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
             key_ctrl_u => try state.editKillLineBackward(),
             key_ctrl_w => try state.editDeletePrevWord(),
             key_esc => {
-                if ((try in.read(&input_buf)) < 1) return null;
+                if ((try term.read(in, &input_buf)) < 1) return null;
                 switch (input_buf[0]) {
                     'b' => try state.editMoveWordStart(),
                     'f' => try state.editMoveWordEnd(),
                     '[' => {
-                        if ((try in.read(&input_buf)) < 1) return null;
+                        if ((try term.read(in, &input_buf)) < 1) return null;
                         switch (input_buf[0]) {
                             '0'...'9' => |num| {
                                 if ((try in.read(&input_buf)) < 1) return null;
@@ -114,7 +114,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
                         }
                     },
                     '0' => {
-                        if ((try in.read(&input_buf)) < 1) return null;
+                        if ((try term.read(in, &input_buf)) < 1) return null;
                         switch (input_buf[0]) {
                             'H' => try state.editMoveHome(),
                             'F' => try state.editMoveEnd(),
@@ -130,7 +130,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
                 const utf8_len = std.unicode.utf8ByteSequenceLength(c) catch continue;
 
                 utf8_buf[0] = c;
-                if ((try in.read(utf8_buf[1..utf8_len])) < utf8_len - 1) return null;
+                if (utf8_len > 1 and (try term.read(in, utf8_buf[1..utf8_len])) < utf8_len - 1) return null;
 
                 try state.editInsert(utf8_buf[0..utf8_len]);
             },
@@ -143,8 +143,8 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
 fn linenoiseRaw(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
     defer out.writeAll("\n") catch {};
 
-    const orig = try enableRawMode(in);
-    defer disableRawMode(in, orig);
+    const orig = try enableRawMode(in, out);
+    defer disableRawMode(in, out, orig);
 
     return try linenoiseEdit(ln, in, out, prompt);
 }
