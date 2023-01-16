@@ -6,8 +6,8 @@ const tcflag_t = std.os.tcflag_t;
 
 const unsupported_term = [_][]const u8{ "dumb", "cons25", "emacs" };
 
-pub fn isUnsupportedTerm() bool {
-    const env_var = std.os.getenv("TERM") orelse return false;
+pub fn isUnsupportedTerm(allocator: std.mem.Allocator) bool {
+    const env_var = std.process.getEnvVarOwned(allocator, "TERM") catch return false;
 
     return for (unsupported_term) |t| {
         if (std.ascii.eqlIgnoreCase(env_var, t))
