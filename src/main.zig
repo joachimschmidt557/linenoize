@@ -11,8 +11,8 @@ const enableRawMode = term.enableRawMode;
 const disableRawMode = term.disableRawMode;
 const getColumns = term.getColumns;
 
-pub const HintsCallback = std.meta.FnPtr(fn (Allocator, []const u8) Allocator.Error!?[]const u8);
-pub const CompletionsCallback = std.meta.FnPtr(fn (Allocator, []const u8) Allocator.Error![]const []const u8);
+pub const HintsCallback = *const fn (Allocator, []const u8) Allocator.Error!?[]const u8;
+pub const CompletionsCallback = *const fn (Allocator, []const u8) Allocator.Error![]const []const u8;
 
 const key_null = 0;
 const key_ctrl_a = 1;
@@ -170,7 +170,7 @@ pub const Linenoise = struct {
             .allocator = allocator,
             .history = History.empty(allocator),
         };
-        self.examineStdIo();
+        self.examineStdIo(allocator);
         return self;
     }
 
@@ -182,10 +182,10 @@ pub const Linenoise = struct {
     /// Re-examine (currently) stdin and environment variables to
     /// check if line editing and prompt printing should be
     /// enabled or not.
-    pub fn examineStdIo(self: *Self) void {
+    pub fn examineStdIo(self: *Self, allocator: Allocator) void {
         const stdin_file = std.io.getStdIn();
         self.is_tty = stdin_file.isTty();
-        self.term_supported = !isUnsupportedTerm();
+        self.term_supported = !isUnsupportedTerm(allocator);
     }
 
     /// Reads a line from the terminal. Caller owns returned memory
