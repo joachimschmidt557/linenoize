@@ -120,7 +120,7 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
             key_backspace, key_ctrl_h => try state.editBackspace(),
             else => {
                 var utf8_buf: [4]u8 = undefined;
-                const utf8_len = std.unicode.utf8CodepointSequenceLength(c) catch continue;
+                const utf8_len = std.unicode.utf8ByteSequenceLength(c) catch continue;
 
                 utf8_buf[0] = c;
                 if ((try in.read(utf8_buf[1..utf8_len])) < utf8_len - 1) return null;
