@@ -8,7 +8,7 @@ const unsupported_term = [_][]const u8{ "dumb", "cons25", "emacs" };
 
 pub fn isUnsupportedTerm(allocator: std.mem.Allocator) bool {
     const env_var = std.process.getEnvVarOwned(allocator, "TERM") catch return false;
-
+    defer allocator.free(env_var);
     return for (unsupported_term) |t| {
         if (std.ascii.eqlIgnoreCase(env_var, t))
             break true;
