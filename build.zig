@@ -1,6 +1,7 @@
-const Builder = @import("std").build.Builder;
+const Build = @import("std").Build;
+const FileSource = Build.FileSource;
 
-pub fn build(b: *Builder) void {
+pub fn build(b: *Build) void {
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
@@ -9,28 +10,39 @@ pub fn build(b: *Builder) void {
 
     // Standard release options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
-    const mode = b.standardReleaseOptions();
+    const optimize = b.standardOptimizeOption(.{});
 
     // Static library
-    const lib = b.addStaticLibrary("linenoise", "src/c.zig");
-    lib.setTarget(target);
-    lib.setBuildMode(mode);
+    const lib = b.addStaticLibrary(.{
+        .name = "linenoise",
+        .root_source_file = FileSource.relative("src/c.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
     lib.linkLibC();
     lib.install();
 
     // Tests
-    var main_tests = b.addTest("src/main.zig");
-    main_tests.setTarget(target);
-    main_tests.setBuildMode(mode);
+    var main_tests = b.addTest(.{
+        .name = "main-tests",
+        .root_source_file = FileSource.relative("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
 
     const test_step = b.step("test", "Run library tests");
     test_step.dependOn(&main_tests.step);
 
     // Zig example
-    var example = b.addExecutable("example", "examples/example.zig");
-    example.addPackagePath("linenoise", "src/main.zig");
-    example.setTarget(target);
-    example.setBuildMode(mode);
+    var example = b.addExecutable(.{
+        .name = "example",
+        .root_source_file = FileSource.relative("examples/example.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    example.addAnonymousModule("linenoise", .{
+        .source_file = FileSource.relative("src/main.zig"),
+    });
 
     var example_run = example.run();
 
@@ -38,12 +50,15 @@ pub fn build(b: *Builder) void {
     example_step.dependOn(&example_run.step);
 
     // C example
-    var c_example = b.addExecutable("example", "examples/example.c");
+    var c_example = b.addExecutable(.{
+        .name =  "example",
+        .root_source_file = FileSource.relative("examples/example.c"),
+        .target = target,
+        .optimize = optimize,
+    });
     c_example.addIncludePath("include");
     c_example.linkLibC();
     c_example.linkLibrary(lib);
-    c_example.setTarget(target);
-    c_example.setBuildMode(mode);
 
     var c_example_run = c_example.run();
 

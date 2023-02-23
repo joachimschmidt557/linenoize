@@ -26,9 +26,9 @@ const LinenoiseCompletions = extern struct {
     }
 };
 
-const linenoiseCompletionCallback = std.meta.FnPtr(fn ([*:0]const u8, *LinenoiseCompletions) callconv(.C) void);
-const linenoiseHintsCallback = std.meta.FnPtr(fn ([*:0]const u8, *c_int, *c_int) callconv(.C) ?[*:0]u8);
-const linenoiseFreeHintsCallback = std.meta.FnPtr(fn (*anyopaque) callconv(.C) void);
+const linenoiseCompletionCallback = *const fn ([*:0]const u8, *LinenoiseCompletions) callconv(.C) void;
+const linenoiseHintsCallback = *const fn ([*:0]const u8, *c_int, *c_int) callconv(.C) ?[*:0]u8;
+const linenoiseFreeHintsCallback = *const fn (*anyopaque) callconv(.C) void;
 
 export fn linenoiseSetCompletionCallback(fun: linenoiseCompletionCallback) void {
     c_completion_callback = fun;
@@ -57,7 +57,8 @@ export fn linenoiseAddCompletion(lc: *LinenoiseCompletions, str: [*:0]const u8) 
     }
 
     completions.append(dupe) catch return;
-    lc.cvec = completions.toOwnedSlice().ptr;
+    const slice = completions.toOwnedSlice() catch return;
+    lc.cvec = slice.ptr;
     lc.len += 1;
 }
 
@@ -76,7 +77,7 @@ fn completionsCallback(allocator: Allocator, line: []const u8) ![]const []const 
             defer lc.free();
 
             const completions = try allocator.alloc([]const u8, lc.len);
-            for (completions) |*x, i| {
+            for (completions, 0..) |*x, i| {
                 x.* = try allocator.dupe(u8, mem.span(raw_completions[i]));
             }
 
