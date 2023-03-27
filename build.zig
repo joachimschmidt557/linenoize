@@ -11,9 +11,14 @@ pub fn build(b: *Build) void {
     // Standard release options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const optimize = b.standardOptimizeOption(.{});
-    
+
     _ = b.addModule("linenoise", .{
         .source_file = .{ .path = "src/main.zig" },
+    });
+
+    const wcwidth = b.dependency("wcwidth", .{
+        .target = target,
+        .optimize = optimize,
     });
 
     // Static library
@@ -23,6 +28,7 @@ pub fn build(b: *Build) void {
         .target = target,
         .optimize = optimize,
     });
+    lib.addModule("wcwidth", wcwidth.module("wcwidth"));
     lib.linkLibC();
     lib.install();
 
@@ -55,7 +61,7 @@ pub fn build(b: *Build) void {
 
     // C example
     var c_example = b.addExecutable(.{
-        .name =  "example",
+        .name = "example",
         .root_source_file = FileSource.relative("examples/example.c"),
         .target = target,
         .optimize = optimize,

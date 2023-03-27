@@ -1,3 +1,0 @@
-[submodule "src/zig-wcwidth"]
-	path = src/zig-wcwidth
-	url = https://github.com/joachimschmidt557/zig-wcwidth
