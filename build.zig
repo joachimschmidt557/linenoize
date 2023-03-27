@@ -12,13 +12,19 @@ pub fn build(b: *Build) void {
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const optimize = b.standardOptimizeOption(.{});
 
-    _ = b.addModule("linenoise", .{
-        .source_file = .{ .path = "src/main.zig" },
-    });
-
     const wcwidth = b.dependency("wcwidth", .{
         .target = target,
         .optimize = optimize,
+    });
+
+    _ = b.addModule("linenoise", .{
+        .source_file = .{ .path = "src/main.zig" },
+        .dependencies = &.{
+            .{
+                .name = "wcwidth",
+                .module = wcwidth.module("wcwidth"),
+            },
+        },
     });
 
     // Static library
