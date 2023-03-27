@@ -11,6 +11,10 @@ pub fn build(b: *Build) void {
     // Standard release options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const optimize = b.standardOptimizeOption(.{});
+    
+    _ = b.addModule("linenoise", .{
+        .source_file = .{ .path = "src/main.zig" },
+    });
 
     // Static library
     const lib = b.addStaticLibrary(.{
