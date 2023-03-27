@@ -2,7 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const expectEqualSlices = std.testing.expectEqualSlices;
 
-const wcwidth = @import("zig-wcwidth/src/main.zig").wcwidth;
+const wcwidth = @import("wcwidth").wcwidth;
 
 pub fn width(s: []const u8) usize {
     var result: usize = 0;
