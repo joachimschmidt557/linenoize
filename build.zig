@@ -17,7 +17,7 @@ pub fn build(b: *Build) void {
         .optimize = optimize,
     });
 
-    _ = b.addModule("linenoise", .{
+    const linenoise = b.addModule("linenoise", .{
         .source_file = .{ .path = "src/main.zig" },
         .dependencies = &.{
             .{
@@ -45,7 +45,7 @@ pub fn build(b: *Build) void {
         .target = target,
         .optimize = optimize,
     });
-
+    main_tests.addModule("wcwidth", wcwidth.module("wcwidth"));
     const test_step = b.step("test", "Run library tests");
     test_step.dependOn(&main_tests.step);
 
@@ -56,9 +56,7 @@ pub fn build(b: *Build) void {
         .target = target,
         .optimize = optimize,
     });
-    example.addAnonymousModule("linenoise", .{
-        .source_file = FileSource.relative("src/main.zig"),
-    });
+    example.addModule("linenoise", linenoise);
 
     var example_run = example.run();
 
