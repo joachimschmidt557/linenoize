@@ -45,7 +45,6 @@ pub fn build(b: *Build) void {
         .target = target,
         .optimize = optimize,
     });
-    main_tests.addModule("wcwidth", wcwidth.module("wcwidth"));
     const test_step = b.step("test", "Run library tests");
     test_step.dependOn(&main_tests.step);
 
