@@ -131,7 +131,7 @@ pub fn getColumns(in: File, out: File) !usize {
     switch (builtin.os.tag) {
         .linux => {
             var wsz: std.os.linux.winsize = undefined;
-            if (std.os.linux.ioctl(in.handle, std.os.linux.T.IOCGWINSZ, @ptrToInt(&wsz)) == 0) {
+            if (std.os.linux.ioctl(in.handle, std.os.linux.T.IOCGWINSZ, @intFromPtr(&wsz)) == 0) {
                 return wsz.ws_col;
             } else {
                 return try getColumnsFallback(in, out);
