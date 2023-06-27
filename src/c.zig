@@ -19,7 +19,7 @@ const LinenoiseCompletions = extern struct {
 
     pub fn free(self: *LinenoiseCompletions) void {
         if (self.cvec) |raw_completions| {
-            const len = @intCast(usize, self.len);
+            const len: usize = @intCast(self.len);
             for (raw_completions[0..len]) |x| global_allocator.free(mem.span(x));
             global_allocator.free(raw_completions[0..len]);
         }
@@ -129,7 +129,7 @@ export fn linenoise(prompt: [*:0]const u8) ?[*:0]u8 {
 }
 
 export fn linenoiseFree(ptr: *anyopaque) void {
-    global_allocator.free(mem.span(@ptrCast([*:0]const u8, ptr)));
+    global_allocator.free(mem.span(@as([*:0]const u8, @ptrCast(ptr))));
 }
 
 export fn linenoiseHistoryAdd(line: [*:0]const u8) c_int {
@@ -140,7 +140,7 @@ export fn linenoiseHistoryAdd(line: [*:0]const u8) c_int {
 
 export fn linenoiseHistorySetMaxLen(len: c_int) c_int {
     if (global_linenoise == null) global_linenoise = Linenoise.init(global_allocator);
-    global_linenoise.?.history.setMaxLen(@intCast(usize, len)) catch return -1;
+    global_linenoise.?.history.setMaxLen(@intCast(len)) catch return -1;
     return 0;
 }
 
