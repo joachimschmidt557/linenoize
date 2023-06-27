@@ -59,20 +59,20 @@ pub fn enableRawMode(in: File, out: File) !termios {
         var raw = orig;
 
         // TODO fix hardcoding of linux
-        raw.iflag &= ~(@intCast(tcflag_t, std.os.linux.BRKINT) |
-            @intCast(tcflag_t, std.os.linux.ICRNL) |
-            @intCast(tcflag_t, std.os.linux.INPCK) |
-            @intCast(tcflag_t, std.os.linux.ISTRIP) |
-            @intCast(tcflag_t, std.os.linux.IXON));
+        raw.iflag &= ~(@as(tcflag_t, @intCast(std.os.linux.BRKINT)) |
+            @as(tcflag_t, @intCast(std.os.linux.ICRNL)) |
+            @as(tcflag_t, @intCast(std.os.linux.INPCK)) |
+            @as(tcflag_t, @intCast(std.os.linux.ISTRIP)) |
+            @as(tcflag_t, @intCast(std.os.linux.IXON)));
 
-        raw.oflag &= ~(@intCast(tcflag_t, std.os.linux.OPOST));
+        raw.oflag &= ~(@as(tcflag_t, @intCast(std.os.linux.OPOST)));
 
-        raw.cflag |= (@intCast(tcflag_t, std.os.linux.CS8));
+        raw.cflag |= (@as(tcflag_t, @intCast(std.os.linux.CS8)));
 
-        raw.lflag &= ~(@intCast(tcflag_t, std.os.linux.ECHO) |
-            @intCast(tcflag_t, std.os.linux.ICANON) |
-            @intCast(tcflag_t, std.os.linux.IEXTEN) |
-            @intCast(tcflag_t, std.os.linux.ISIG));
+        raw.lflag &= ~(@as(tcflag_t, @intCast(std.os.linux.ECHO)) |
+            @as(tcflag_t, @intCast(std.os.linux.ICANON)) |
+            @as(tcflag_t, @intCast(std.os.linux.IEXTEN)) |
+            @as(tcflag_t, @intCast(std.os.linux.ISIG)));
 
         // FIXME
         // raw.cc[std.os.VMIN] = 1;
@@ -140,7 +140,7 @@ pub fn getColumns(in: File, out: File) !usize {
         .windows => {
             var csbi: w.CONSOLE_SCREEN_BUFFER_INFO = undefined;
             _ = k32.GetConsoleScreenBufferInfo(out.handle, &csbi);
-            return @intCast(usize, csbi.dwSize.X);
+            return @intCast(csbi.dwSize.X);
         },
         else => return try getColumnsFallback(in, out),
     }
