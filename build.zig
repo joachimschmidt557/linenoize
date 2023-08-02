@@ -65,7 +65,7 @@ pub fn build(b: *Build) void {
         .target = target,
         .optimize = optimize,
     });
-    c_example.addIncludePath("include");
+    c_example.addIncludePath(.{ .path = "include" });
     c_example.linkLibC();
     c_example.linkLibrary(lib);
 
