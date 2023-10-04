@@ -20,7 +20,6 @@ pub fn isUnsupportedTerm(allocator: std.mem.Allocator) bool {
 
 const w = struct {
     pub usingnamespace std.os.windows;
-    pub const ENABLE_VIRTUAL_TERMINAL_PROCESSING = @as(c_int, 0x4);
     pub const ENABLE_VIRTUAL_TERMINAL_INPUT = @as(c_int, 0x200);
     pub const CP_UTF8 = @as(c_int, 65001);
     pub const INPUT_RECORD = extern struct {
