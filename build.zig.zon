@@ -3,9 +3,18 @@
     .version = "0.1.0",
     .dependencies = .{
         .wcwidth = .{
-            // FIXME: This points to https://github.com/joachimschmidt557/zig-wcwidth/pull/4, update to master branch commit once merged
-            .url = "https://github.com/joachimschmidt557/zig-wcwidth/archive/f194f5a0b313bdf6be13aef0580d74f65a30f970.tar.gz",
+            .url = "https://github.com/joachimschmidt557/zig-wcwidth/archive/7fc06445d17beb94fe06ad0d60d636e40fe8490a.tar.gz",
             .hash = "1220ae6991b133c3c0f9b8989ee15f26d02f44a21ef5d77ca1e8c3232356cb45d51b",
         },
+    },
+    .paths = .{
+        "LICENSE",
+        "README.md",
+        "build.zig",
+        "build.zig.zon",
+        "history.txt",
+        "examples/",
+        "includes/",
+        "src/",
     },
 }
