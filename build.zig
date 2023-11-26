@@ -32,7 +32,7 @@ pub fn build(b: *Build) void {
     b.installArtifact(lib);
 
     // Tests
-    var main_tests = b.addTest(.{
+    const main_tests = b.addTest(.{
         .name = "main-tests",
         .root_source_file = FileSource.relative("src/main.zig"),
         .target = target,
