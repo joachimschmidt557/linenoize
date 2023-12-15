@@ -414,11 +414,7 @@ pub const LinenoiseState = struct {
             );
         }
 
-        std.mem.copy(
-            u8,
-            self.buf.items[self.pos .. self.pos + c.len],
-            c,
-        );
+        @memcpy(self.buf.items[self.pos..][0..c.len], c);
         self.pos += c.len;
         try self.refreshLine();
     }
@@ -516,51 +512,86 @@ pub const LinenoiseState = struct {
     }
 
     pub fn editDelete(self: *Self) !void {
-        if (self.buf.items.len > 0 and self.pos < self.buf.items.len) {
-            const utf8_len = std.unicode.utf8CodepointSequenceLength(self.buf.items[self.pos]) catch 1;
-            std.mem.copy(u8, self.buf.items[self.pos..], self.buf.items[self.pos + utf8_len ..]);
-            try self.buf.resize(self.allocator, self.buf.items.len - utf8_len);
-            try self.refreshLine();
-        }
+        if (self.buf.items.len == 0 or self.pos >= self.buf.items.len) return;
+
+        const utf8_len = std.unicode.utf8CodepointSequenceLength(self.buf.items[self.pos]) catch 1;
+        std.mem.copyForwards(
+            u8,
+            self.buf.items[self.pos .. self.buf.items.len - utf8_len],
+            self.buf.items[self.pos + utf8_len .. self.buf.items.len],
+        );
+        try self.buf.resize(self.allocator, self.buf.items.len - utf8_len);
+        try self.refreshLine();
     }
 
     pub fn editBackspace(self: *Self) !void {
         if (self.buf.items.len == 0 or self.pos == 0) return;
 
-        const len = self.prevCodepointLen(self.pos);
-        std.mem.copy(u8, self.buf.items[self.pos - len ..], self.buf.items[self.pos..]);
-        self.pos -= len;
-        try self.buf.resize(self.allocator, self.buf.items.len - len);
+        const utf8_len = self.prevCodepointLen(self.pos);
+        std.mem.copyForwards(
+            u8,
+            self.buf.items[self.pos - utf8_len .. self.buf.items.len - utf8_len],
+            self.buf.items[self.pos..self.buf.items.len],
+        );
+        self.pos -= utf8_len;
+        try self.buf.resize(self.allocator, self.buf.items.len - utf8_len);
         try self.refreshLine();
     }
 
     pub fn editSwapPrev(self: *Self) !void {
-        const prev_len = self.prevCodepointLen(self.pos);
-        const prevprev_len = self.prevCodepointLen(self.pos - prev_len);
-        if (prev_len == 0 or prevprev_len == 0) return;
+        //    aaa bb            =>   bb aaa
+        //   ^   ^  ^- pos_end      ^  ^   ^- pos_end
+        //   |   |                  |  |
+        //   |   pos_1              |  pos_2
+        // pos_begin            pos_begin
 
-        var tmp: [4]u8 = undefined;
-        std.mem.copy(u8, &tmp, self.buf.items[self.pos - (prev_len + prevprev_len) .. self.pos - prev_len]);
-        std.mem.copy(u8, self.buf.items[self.pos - (prev_len + prevprev_len) ..], self.buf.items[self.pos - prev_len .. self.pos]);
-        std.mem.copy(u8, self.buf.items[self.pos - prevprev_len ..], tmp[0..prevprev_len]);
+        const pos_end = self.pos;
+        const b_len = self.prevCodepointLen(pos_end);
+        const pos_1 = pos_end - b_len;
+        const a_len = self.prevCodepointLen(pos_1);
+        const pos_begin = pos_1 - a_len;
+        const pos_2 = pos_begin + b_len;
+
+        if (a_len == 0 or b_len == 0) return;
+
+        // save both codepoints
+        var tmp: [8]u8 = undefined;
+        @memcpy(
+            tmp[0 .. a_len + b_len],
+            self.buf.items[pos_begin..pos_end],
+        );
+        // write b from tmp
+        @memcpy(
+            self.buf.items[pos_begin..pos_2],
+            tmp[a_len .. a_len + b_len],
+        );
+        // write a from tmp
+        @memcpy(
+            self.buf.items[pos_2..pos_end],
+            tmp[0..a_len],
+        );
 
         try self.refreshLine();
     }
 
     pub fn editDeletePrevWord(self: *Self) !void {
-        if (self.buf.items.len > 0 and self.pos > 0) {
-            const old_pos = self.pos;
-            while (self.pos > 0 and self.buf.items[self.pos - 1] == ' ')
-                self.pos -= 1;
-            while (self.pos > 0 and self.buf.items[self.pos - 1] != ' ')
-                self.pos -= 1;
+        if (self.buf.items.len == 0 or self.pos == 0) return;
 
-            const diff = old_pos - self.pos;
-            const new_len = self.buf.items.len - diff;
-            std.mem.copy(u8, self.buf.items[self.pos..new_len], self.buf.items[old_pos..]);
-            try self.buf.resize(self.allocator, new_len);
-            try self.refreshLine();
-        }
+        const old_pos = self.pos;
+        while (self.pos > 0 and self.buf.items[self.pos - 1] == ' ')
+            self.pos -= 1;
+        while (self.pos > 0 and self.buf.items[self.pos - 1] != ' ')
+            self.pos -= 1;
+
+        const diff = old_pos - self.pos;
+        const new_len = self.buf.items.len - diff;
+        std.mem.copyForwards(
+            u8,
+            self.buf.items[self.pos..new_len],
+            self.buf.items[old_pos..self.buf.items.len],
+        );
+        try self.buf.resize(self.allocator, new_len);
+        try self.refreshLine();
     }
 
     pub fn editKillLineForward(self: *Self) !void {
@@ -570,7 +601,11 @@ pub const LinenoiseState = struct {
 
     pub fn editKillLineBackward(self: *Self) !void {
         const new_len = self.buf.items.len - self.pos;
-        std.mem.copy(u8, self.buf.items, self.buf.items[self.pos..]);
+        std.mem.copyForwards(
+            u8,
+            self.buf.items[0..new_len],
+            self.buf.items[self.pos..self.buf.items.len],
+        );
         self.pos = 0;
         try self.buf.resize(self.allocator, new_len);
         try self.refreshLine();

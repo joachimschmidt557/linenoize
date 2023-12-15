@@ -30,7 +30,11 @@ pub const History = struct {
         if (self.hist.items.len > self.max_len) {
             const surplus = self.hist.items.len - self.max_len;
             for (self.hist.items[0..surplus]) |x| self.allocator.free(x);
-            std.mem.copy([]const u8, self.hist.items[0..self.max_len], self.hist.items[surplus..]);
+            std.mem.copyForwards(
+                []const u8,
+                self.hist.items[0..self.max_len],
+                self.hist.items[surplus..],
+            );
             self.hist.shrinkAndFree(self.allocator, self.max_len);
         }
     }
