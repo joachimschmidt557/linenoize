@@ -164,10 +164,10 @@ fn readWin32Console(self: File, buffer: []u8) !usize {
     while (toRead > 0) {
         if (utf8ConsoleReadBytes > 0) {
             const existing = @min(toRead, utf8ConsoleReadBytes);
-            std.mem.copy(u8, buffer[(buffer.len - toRead)..], utf8ConsoleBuffer[0..existing]);
+            @memcpy(buffer[(buffer.len - toRead)..], utf8ConsoleBuffer[0..existing]);
             utf8ConsoleReadBytes -= existing;
             if (utf8ConsoleReadBytes > 0)
-                std.mem.copy(u8, &utf8ConsoleBuffer, utf8ConsoleBuffer[existing..]);
+                std.mem.copyForwards(u8, &utf8ConsoleBuffer, utf8ConsoleBuffer[existing..]);
             toRead -= existing;
             continue;
         }
