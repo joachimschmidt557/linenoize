@@ -1,5 +1,4 @@
 const Build = @import("std").Build;
-const FileSource = Build.FileSource;
 
 pub fn build(b: *Build) void {
     const target = b.standardTargetOptions(.{});
@@ -11,8 +10,8 @@ pub fn build(b: *Build) void {
     }).module("wcwidth");
 
     const linenoise = b.addModule("linenoise", .{
-        .source_file = .{ .path = "src/main.zig" },
-        .dependencies = &.{
+        .root_source_file = .{ .path = "src/main.zig" },
+        .imports = &.{
             .{
                 .name = "wcwidth",
                 .module = wcwidth,
@@ -23,18 +22,18 @@ pub fn build(b: *Build) void {
     // Static library
     const lib = b.addStaticLibrary(.{
         .name = "linenoise",
-        .root_source_file = FileSource.relative("src/c.zig"),
+        .root_source_file = .{ .path = "src/c.zig" },
         .target = target,
         .optimize = optimize,
     });
-    lib.addModule("wcwidth", wcwidth);
+    lib.root_module.addImport("wcwidth", wcwidth);
     lib.linkLibC();
     b.installArtifact(lib);
 
     // Tests
     const main_tests = b.addTest(.{
         .name = "main-tests",
-        .root_source_file = FileSource.relative("src/main.zig"),
+        .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
     });
@@ -47,11 +46,11 @@ pub fn build(b: *Build) void {
     // Zig example
     var example = b.addExecutable(.{
         .name = "example",
-        .root_source_file = FileSource.relative("examples/example.zig"),
+        .root_source_file = .{ .path = "examples/example.zig" },
         .target = target,
         .optimize = optimize,
     });
-    example.addModule("linenoise", linenoise);
+    example.root_module.addImport("linenoise", linenoise);
 
     var example_run = b.addRunArtifact(example);
 
@@ -61,10 +60,10 @@ pub fn build(b: *Build) void {
     // C example
     var c_example = b.addExecutable(.{
         .name = "example",
-        .root_source_file = FileSource.relative("examples/example.c"),
         .target = target,
         .optimize = optimize,
     });
+    c_example.root_module.addCSourceFile(.{ .file = .{ .path = "examples/example.c" } });
     c_example.addIncludePath(.{ .path = "include" });
     c_example.linkLibC();
     c_example.linkLibrary(lib);
