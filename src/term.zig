@@ -2,8 +2,6 @@ const std = @import("std");
 const builtin = @import("builtin");
 const File = std.fs.File;
 
-const tcflag_t = std.os.tcflag_t;
-
 const unsupported_term = [_][]const u8{ "dumb", "cons25", "emacs" };
 
 const is_windows = builtin.os.tag == .windows;
@@ -57,21 +55,20 @@ pub fn enableRawMode(in: File, out: File) !termios {
         const orig = try std.os.tcgetattr(in.handle);
         var raw = orig;
 
-        // TODO fix hardcoding of linux
-        raw.iflag &= ~(@as(tcflag_t, @intCast(std.os.linux.BRKINT)) |
-            @as(tcflag_t, @intCast(std.os.linux.ICRNL)) |
-            @as(tcflag_t, @intCast(std.os.linux.INPCK)) |
-            @as(tcflag_t, @intCast(std.os.linux.ISTRIP)) |
-            @as(tcflag_t, @intCast(std.os.linux.IXON)));
+        raw.iflag.BRKINT = false;
+        raw.iflag.ICRNL = false;
+        raw.iflag.INPCK = false;
+        raw.iflag.ISTRIP = false;
+        raw.iflag.IXON = false;
 
-        raw.oflag &= ~(@as(tcflag_t, @intCast(std.os.linux.OPOST)));
+        raw.oflag.OPOST = false;
 
-        raw.cflag |= (@as(tcflag_t, @intCast(std.os.linux.CS8)));
+        raw.cflag.CSIZE = .CS8;
 
-        raw.lflag &= ~(@as(tcflag_t, @intCast(std.os.linux.ECHO)) |
-            @as(tcflag_t, @intCast(std.os.linux.ICANON)) |
-            @as(tcflag_t, @intCast(std.os.linux.IEXTEN)) |
-            @as(tcflag_t, @intCast(std.os.linux.ISIG)));
+        raw.lflag.ECHO = false;
+        raw.lflag.ICANON = false;
+        raw.lflag.IEXTEN = false;
+        raw.lflag.ISIG = false;
 
         // FIXME
         // raw.cc[std.os.VMIN] = 1;
