@@ -5,7 +5,7 @@ const File = std.fs.File;
 const unsupported_term = [_][]const u8{ "dumb", "cons25", "emacs" };
 
 const is_windows = builtin.os.tag == .windows;
-const termios = if (!is_windows) std.os.termios else struct { inMode: w.DWORD, outMode: w.DWORD };
+const termios = if (!is_windows) std.posix.termios else struct { inMode: w.DWORD, outMode: w.DWORD };
 
 pub fn isUnsupportedTerm(allocator: std.mem.Allocator) bool {
     const env_var = std.process.getEnvVarOwned(allocator, "TERM") catch return false;
@@ -52,7 +52,7 @@ pub fn enableRawMode(in: File, out: File) !termios {
         _ = k32.SetConsoleOutputCP(w.CP_UTF8);
         return result;
     } else {
-        const orig = try std.os.tcgetattr(in.handle);
+        const orig = try std.posix.tcgetattr(in.handle);
         var raw = orig;
 
         raw.iflag.BRKINT = false;
@@ -74,7 +74,7 @@ pub fn enableRawMode(in: File, out: File) !termios {
         // raw.cc[std.os.VMIN] = 1;
         // raw.cc[std.os.VTIME] = 0;
 
-        try std.os.tcsetattr(in.handle, std.os.TCSA.FLUSH, raw);
+        try std.posix.tcsetattr(in.handle, std.posix.TCSA.FLUSH, raw);
 
         return orig;
     }
@@ -85,7 +85,7 @@ pub fn disableRawMode(in: File, out: File, orig: termios) void {
         _ = k32.SetConsoleMode(in.handle, orig.inMode);
         _ = k32.SetConsoleMode(out.handle, orig.outMode);
     } else {
-        std.os.tcsetattr(in.handle, std.os.TCSA.FLUSH, orig) catch {};
+        std.posix.tcsetattr(in.handle, std.posix.TCSA.FLUSH, orig) catch {};
     }
 }
 
