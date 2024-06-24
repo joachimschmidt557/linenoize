@@ -10,7 +10,7 @@ pub fn build(b: *Build) void {
     }).module("wcwidth");
 
     const linenoise = b.addModule("linenoise", .{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .imports = &.{
             .{
                 .name = "wcwidth",
@@ -22,7 +22,7 @@ pub fn build(b: *Build) void {
     // Static library
     const lib = b.addStaticLibrary(.{
         .name = "linenoise",
-        .root_source_file = .{ .path = "src/c.zig" },
+        .root_source_file = b.path("src/c.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -33,7 +33,7 @@ pub fn build(b: *Build) void {
     // Tests
     const main_tests = b.addTest(.{
         .name = "main-tests",
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -46,7 +46,7 @@ pub fn build(b: *Build) void {
     // Zig example
     var example = b.addExecutable(.{
         .name = "example",
-        .root_source_file = .{ .path = "examples/example.zig" },
+        .root_source_file = b.path("examples.example.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -63,8 +63,8 @@ pub fn build(b: *Build) void {
         .target = target,
         .optimize = optimize,
     });
-    c_example.root_module.addCSourceFile(.{ .file = .{ .path = "examples/example.c" } });
-    c_example.addIncludePath(.{ .path = "include" });
+    c_example.root_module.addCSourceFile(.{ .file = b.path("examples/example.c") });
+    c_example.addIncludePath(b.path("include"));
     c_example.linkLibC();
     c_example.linkLibrary(lib);
 
