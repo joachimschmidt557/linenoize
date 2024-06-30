@@ -3,8 +3,8 @@
     .version = "0.1.0",
     .dependencies = .{
         .wcwidth = .{
-            .url = "https://github.com/joachimschmidt557/zig-wcwidth/archive/92c512385d738562078e99f7a38ad0a2502f774b.tar.gz",
-            .hash = "122033a86b93c9340971cc7b81de98a2d4ad5ee35724723bb7165655be0b4d95098b",
+            .url = "https://github.com/joachimschmidt557/zig-wcwidth/archive/8d5307213108c54eb1a2dbe4a1fef4daf5cf54b2.tar.gz",
+            .hash = "12209b38e3797fbb62eae2e03346d76af7bb750b0c511200e19933bfdd853cbe6c74",
         },
     },
     .paths = .{
