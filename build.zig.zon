@@ -12,7 +12,6 @@
         "README.md",
         "build.zig",
         "build.zig.zon",
-        "history.txt",
         "examples/",
         "includes/",
         "src/",
