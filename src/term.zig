@@ -28,7 +28,6 @@ const w = struct {
 
 const k32 = struct {
     pub usingnamespace std.os.windows.kernel32;
-    pub extern "kernel32" fn SetConsoleMode(hConsoleHandle: w.HANDLE, dwMode: w.DWORD) callconv(w.WINAPI) w.BOOL;
     pub extern "kernel32" fn SetConsoleCP(wCodePageID: w.UINT) callconv(w.WINAPI) w.BOOL;
     pub extern "kernel32" fn PeekConsoleInputW(hConsoleInput: w.HANDLE, lpBuffer: [*]w.INPUT_RECORD, nLength: w.DWORD, lpNumberOfEventsRead: ?*w.DWORD) callconv(w.WINAPI) w.BOOL;
     pub extern "kernel32" fn ReadConsoleW(hConsoleInput: w.HANDLE, lpBuffer: [*]u16, nNumberOfCharsToRead: w.DWORD, lpNumberOfCharsRead: ?*w.DWORD, lpReserved: ?*anyopaque) callconv(w.WINAPI) w.BOOL;
@@ -183,7 +182,7 @@ fn readWin32Console(self: File, buffer: []u8) !usize {
             break :_ 2;
         } else 1;
         //WideCharToMultiByte(GetConsoleCP(), 0, buf, bufLen, converted, sizeof(converted), NULL, NULL);
-        utf8ConsoleReadBytes += try std.unicode.utf16leToUtf8(&utf8ConsoleBuffer, wideBuf[0..wideBufLen]);
+        utf8ConsoleReadBytes += try std.unicode.utf16LeToUtf8(&utf8ConsoleBuffer, wideBuf[0..wideBufLen]);
     }
     return buffer.len - toRead;
 }
