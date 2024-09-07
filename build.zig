@@ -46,7 +46,7 @@ pub fn build(b: *Build) void {
     // Zig example
     var example = b.addExecutable(.{
         .name = "example",
-        .root_source_file = b.path("examples.example.zig"),
+        .root_source_file = b.path("examples/example.zig"),
         .target = target,
         .optimize = optimize,
     });
