@@ -50,7 +50,7 @@ pub const History = struct {
 
     /// Removes the last item (newest item) of the history
     pub fn pop(self: *Self) void {
-        self.allocator.free(self.hist.pop());
+        self.allocator.free(self.hist.pop().?);
     }
 
     /// Loads the history from a file
