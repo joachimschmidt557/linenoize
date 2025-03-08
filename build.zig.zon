@@ -1,10 +1,11 @@
 .{
-    .name = "linenoise",
+    .name = .linenoize,
+    .fingerprint = 0xfa03aea2f0cab127,
     .version = "0.1.0",
     .dependencies = .{
         .wcwidth = .{
-            .url = "https://github.com/joachimschmidt557/zig-wcwidth/archive/8d5307213108c54eb1a2dbe4a1fef4daf5cf54b2.tar.gz",
-            .hash = "12209b38e3797fbb62eae2e03346d76af7bb750b0c511200e19933bfdd853cbe6c74",
+            .url = "git+https://github.com/joachimschmidt557/zig-wcwidth?ref=v0.1.0#4f5c8efa838da57c9e1b14506138936964835999",
+            .hash = "wcwidth-0.1.0-A4Aa6obmAAC40epfTYwhsdITDO3M6dHEWf6C0jeGMWrV",
         },
     },
     .paths = .{

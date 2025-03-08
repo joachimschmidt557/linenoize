@@ -103,7 +103,7 @@ fn getCursorPosition(in: File, out: File) !usize {
     if (!std.mem.startsWith(u8, "\x1B[", answer))
         return error.CursorPos;
 
-    var iter = std.mem.split(u8, answer[2..], ";");
+    var iter = std.mem.splitScalar(u8, answer[2..], ';');
     _ = iter.next() orelse return error.CursorPos;
     const x = iter.next() orelse return error.CursorPos;
 
@@ -124,20 +124,26 @@ fn getColumnsFallback(in: File, out: File) !usize {
 
 pub fn getColumns(in: File, out: File) !usize {
     switch (builtin.os.tag) {
-        .linux => {
-            var wsz: std.os.linux.winsize = undefined;
-            if (std.os.linux.ioctl(in.handle, std.os.linux.T.IOCGWINSZ, @intFromPtr(&wsz)) == 0) {
-                return wsz.ws_col;
-            } else {
-                return try getColumnsFallback(in, out);
-            }
-        },
         .windows => {
             var csbi: w.CONSOLE_SCREEN_BUFFER_INFO = undefined;
             _ = k32.GetConsoleScreenBufferInfo(out.handle, &csbi);
             return @intCast(csbi.dwSize.X);
         },
-        else => return try getColumnsFallback(in, out),
+        else => {
+            var winsize: std.posix.winsize = .{
+                .row = 0,
+                .col = 0,
+                .xpixel = 0,
+                .ypixel = 0,
+            };
+
+            const err = std.posix.system.ioctl(in.handle, std.posix.T.IOCGWINSZ, @intFromPtr(&winsize));
+            if (std.posix.errno(err) == .SUCCESS) {
+                return winsize.col;
+            } else {
+                return try getColumnsFallback(in, out);
+            }
+        },
     }
 }
 

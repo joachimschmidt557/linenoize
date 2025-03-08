@@ -3,7 +3,7 @@
 A port of [linenoise](https://github.com/antirez/linenoise) to zig
 aiming to be a simple readline for command-line applications written
 in zig. It is written in pure zig and doesn't require
-libc. `linenoize` works with the latest stable zig version (0.13.0).
+libc. `linenoize` works with the latest stable zig version (0.14.0).
 
 In addition to being a full-fledged zig library, `linenoize` also
 serves as a drop-in replacement for linenoise. As a proof of concept,
@@ -22,9 +22,8 @@ c-example`.
 ### Supported platforms
 
 - Linux
-- macOS (Experimental)
-- TODO: Windows
-- TODO: FreeBSD
+- macOS
+- Windows
 
 ## Examples
 
@@ -55,38 +54,41 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
+const log = std.log.scoped(.main);
+
 const Linenoise = @import("linenoise").Linenoise;
 
-fn completion(alloc: *Allocator, buf: []const u8) ![][]const u8 {
+fn completion(allocator: Allocator, buf: []const u8) ![]const []const u8 {
     if (std.mem.eql(u8, "z", buf)) {
-        var result = ArrayList([]const u8).init(alloc);
-        try result.append(try alloc.dupe(u8, "zig"));
-        try result.append(try alloc.dupe(u8, "ziglang"));
+        var result = ArrayList([]const u8).init(allocator);
+        try result.append(try allocator.dupe(u8, "zig"));
+        try result.append(try allocator.dupe(u8, "ziglang"));
         return result.toOwnedSlice();
     } else {
         return &[_][]const u8{};
     }
 }
 
-fn hints(alloc: *Allocator, buf: []const u8) !?[]const u8 {
+fn hints(allocator: Allocator, buf: []const u8) !?[]const u8 {
     if (std.mem.eql(u8, "hello", buf)) {
-        return try alloc.dupe(u8, " World");
+        return try allocator.dupe(u8, " World");
     } else {
         return null;
     }
 }
 
+var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
+
 pub fn main() !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = &arena.allocator;
+    defer _ = debug_allocator.deinit();
+    const allocator = debug_allocator.allocator();
 
     var ln = Linenoise.init(allocator);
     defer ln.deinit();
 
     // Load history and save history later
-    ln.history.load("history.txt") catch std.debug.print("Failed to load history\n", .{});
-    defer ln.history.save("history.txt") catch std.debug.print("Failed to save history\n", .{});
+    ln.history.load("history.txt") catch log.err("Failed to load history", .{});
+    defer ln.history.save("history.txt") catch log.err("Failed to save history", .{});
 
     // Set up hints callback
     ln.hints_callback = hints;
@@ -100,9 +102,9 @@ pub fn main() !void {
     // Enable multiline mode
     // ln.multiline_mode = true;
 
-    while (try ln.linenoise("hello> ")) |input| {
+    while (try ln.linenoise("hellö> ")) |input| {
         defer allocator.free(input);
-        std.debug.print("input: {s}\n", .{input});
+        log.info("input: {s}", .{input});
         try ln.history.add(input);
     }
 }
