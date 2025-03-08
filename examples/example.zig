@@ -25,10 +25,11 @@ fn hints(allocator: Allocator, buf: []const u8) !?[]const u8 {
     }
 }
 
+var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
+
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    defer _ = debug_allocator.deinit();
+    const allocator = debug_allocator.allocator();
 
     var ln = Linenoise.init(allocator);
     defer ln.deinit();
