@@ -12,19 +12,20 @@ pub fn build(b: *Build) void {
     const linenoise = b.addModule("linenoise", .{
         .root_source_file = b.path("src/main.zig"),
         .imports = &.{
-            .{
-                .name = "wcwidth",
-                .module = wcwidth,
-            },
+            .{ .name = "wcwidth", .module = wcwidth },
         },
+        .target = target,
+        .optimize = optimize,
     });
 
     // Static library
     const lib = b.addStaticLibrary(.{
         .name = "linenoise",
-        .root_source_file = b.path("src/c.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/c.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     lib.root_module.addImport("wcwidth", wcwidth);
     lib.linkLibC();
@@ -32,10 +33,7 @@ pub fn build(b: *Build) void {
 
     // Tests
     const main_tests = b.addTest(.{
-        .name = "main-tests",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = linenoise,
     });
 
     const run_main_tests = b.addRunArtifact(main_tests);
@@ -46,9 +44,11 @@ pub fn build(b: *Build) void {
     // Zig example
     var example = b.addExecutable(.{
         .name = "example",
-        .root_source_file = b.path("examples/example.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("examples/example.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     example.root_module.addImport("linenoise", linenoise);
 
@@ -60,8 +60,10 @@ pub fn build(b: *Build) void {
     // C example
     var c_example = b.addExecutable(.{
         .name = "example",
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     c_example.root_module.addCSourceFile(.{ .file = b.path("examples/example.c") });
     c_example.addIncludePath(b.path("include"));
