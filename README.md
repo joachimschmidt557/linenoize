@@ -27,14 +27,9 @@ c-example`.
 
 ## Add linenoize to a project
 
-Add linenoize as a dependency to your `build.zig.zon` file:
+Add linenoize as a dependency to your project:
 ```zig
-.dependencies = .{
-    .linenoize = .{
-        .url = "git+https://github.com/joachimschmidt557/linenoize.git#752446d1cafad2bdd58768baa7337a3e9a7d1bf2",
-        .hash = "linenoize-0.1.0-J7HK8OnXAACP-w7_hZWvBIy7xU7ccbeeh0ZfBbZIFgND",
-    },
-},
+zig fetch --save git+https://github.com/joachimschmidt557/linenoize.git#v0.1.0
 ```
 
 Then add the following code to your `build.zig` file:
