@@ -25,6 +25,22 @@ c-example`.
 - macOS
 - Windows
 
+## Add linenoize to a project
+
+Add linenoize as a dependency to your project:
+```bash
+zig fetch --save git+https://github.com/joachimschmidt557/linenoize.git#v0.1.0
+```
+
+Then add the following code to your `build.zig` file:
+```zig
+const linenoize = b.dependency("linenoize", .{
+    .target = target,
+    .optimize = optimize,
+}).module("linenoise");
+exe.root_module.addImport("linenoize", linenoize);
+```
+
 ## Examples
 
 ### Minimal example
