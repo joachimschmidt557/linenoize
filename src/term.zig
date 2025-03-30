@@ -138,7 +138,7 @@ pub fn getColumns(in: File, out: File) !usize {
             };
 
             const err = std.posix.system.ioctl(in.handle, std.posix.T.IOCGWINSZ, @intFromPtr(&winsize));
-            if (std.posix.errno(err) == .SUCCESS) {
+            if (std.posix.errno(err) == .SUCCESS and winsize.col > 0) {
                 return winsize.col;
             } else {
                 return try getColumnsFallback(in, out);
