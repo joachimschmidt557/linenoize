@@ -28,7 +28,7 @@ c-example`.
 ## Add linenoize to a project
 
 Add linenoize as a dependency to your project:
-```zig
+```bash
 zig fetch --save git+https://github.com/joachimschmidt557/linenoize.git#v0.1.0
 ```
 
