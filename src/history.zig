@@ -6,7 +6,7 @@ const max_line_len = 4096;
 
 pub const History = struct {
     allocator: Allocator,
-    hist: ArrayListUnmanaged([]const u8) = .{},
+    hist: ArrayListUnmanaged([]const u8) = .empty,
     max_len: usize = 100,
     current: usize = 0,
 
@@ -14,7 +14,7 @@ pub const History = struct {
 
     /// Creates a new empty history
     pub fn empty(allocator: Allocator) Self {
-        return Self{
+        return .{
             .allocator = allocator,
         };
     }
@@ -85,7 +85,7 @@ pub const History = struct {
     /// Sets the maximum number of history items. If more history
     /// items than len exist, this will truncate the history to the
     /// len most recent items.
-    pub fn setMaxLen(self: *Self, len: usize) !void {
+    pub fn setMaxLen(self: *Self, len: usize) void {
         self.max_len = len;
         self.truncate();
     }

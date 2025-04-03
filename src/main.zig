@@ -173,7 +173,7 @@ pub const Linenoise = struct {
 
     /// Initialize a linenoise struct
     pub fn init(allocator: Allocator) Self {
-        var self = Self{
+        var self: Self = .{
             .allocator = allocator,
             .history = History.empty(allocator),
         };

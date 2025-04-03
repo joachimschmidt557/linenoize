@@ -123,7 +123,7 @@ pub const LinenoiseState = struct {
 
     stdin: File,
     stdout: File,
-    buf: ArrayListUnmanaged(u8) = .{},
+    buf: ArrayListUnmanaged(u8) = .empty,
     prompt: []const u8,
     pos: usize = 0,
     old_pos: usize = 0,
@@ -133,7 +133,7 @@ pub const LinenoiseState = struct {
     const Self = @This();
 
     pub fn init(ln: *Linenoise, in: File, out: File, prompt: []const u8) Self {
-        return Self{
+        return .{
             .allocator = ln.allocator,
             .ln = ln,
 

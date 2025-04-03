@@ -67,7 +67,7 @@ fn completionsCallback(allocator: Allocator, line: []const u8) ![]const []const 
         const lineZ = try allocator.dupeZ(u8, line);
         defer allocator.free(lineZ);
 
-        var lc = LinenoiseCompletions{
+        var lc: LinenoiseCompletions = .{
             .len = 0,
             .cvec = null,
         };
@@ -140,7 +140,7 @@ export fn linenoiseHistoryAdd(line: [*:0]const u8) c_int {
 
 export fn linenoiseHistorySetMaxLen(len: c_int) c_int {
     if (global_linenoise == null) global_linenoise = Linenoise.init(global_allocator);
-    global_linenoise.?.history.setMaxLen(@intCast(len)) catch return -1;
+    global_linenoise.?.history.setMaxLen(@intCast(len));
     return 0;
 }
 
