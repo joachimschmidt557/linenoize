@@ -1,7 +1,7 @@
 .{
     .name = .linenoize,
     .fingerprint = 0xfa03aea2f0cab127,
-    .version = "0.1.0",
+    .version = "0.1.1",
     .dependencies = .{
         .wcwidth = .{
             .url = "git+https://github.com/joachimschmidt557/zig-wcwidth?ref=v0.1.0#4f5c8efa838da57c9e1b14506138936964835999",
