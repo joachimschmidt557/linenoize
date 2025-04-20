@@ -124,6 +124,15 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
                     else => {},
                 }
             },
+            '5' => {
+                if ((try term.read(in, &input_buf)) < 1) return null;
+
+                switch (input_buf[0]) {
+                    'C' => try state.editMoveWordEnd(), // ESC[1;5C = ctrl + right arrow
+                    'D' => try state.editMoveWordStart(), // ESC[1;5D = ctrl + left arrow
+                    else => {},
+                }
+            },
             key_backspace, key_ctrl_h => try state.editBackspace(),
             else => {
                 var utf8_buf: [4]u8 = undefined;
