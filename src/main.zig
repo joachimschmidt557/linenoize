@@ -34,6 +34,73 @@ const key_ctrl_w = 23;
 const key_esc = 27;
 const key_backspace = 127;
 
+fn editCsi(state: *LinenoiseState) !void {
+    const in = state.stdin;
+    var input_buf: [1]u8 = undefined;
+
+    if ((try term.read(in, &input_buf)) < 1) return error.EndOfFile;
+    switch (input_buf[0]) {
+        '0'...'9' => |num| {
+            if ((try in.read(&input_buf)) < 1) return error.EndOfFile;
+            switch (input_buf[0]) {
+                '~' => switch (num) {
+                    '1', '7' => try state.editMoveHome(),
+                    '3' => try state.editDelete(),
+                    '4', '8' => try state.editMoveEnd(),
+                    else => {},
+                },
+                ';' => switch (num) {
+                    '1' => {
+                        if ((try in.read(&input_buf)) < 1) return error.EndOfFile;
+                        switch (input_buf[0]) {
+                            '5' => {
+                                if ((try term.read(in, &input_buf)) < 1) return error.EndOfFile;
+                                switch (input_buf[0]) {
+                                    'C' => try state.editMoveWordEnd(), // ESC[1;5C = ctrl + right arrow
+                                    'D' => try state.editMoveWordStart(), // ESC[1;5D = ctrl + left arrow
+                                    else => {},
+                                }
+                            },
+                            else => {},
+                        }
+                    },
+                    else => {},
+                },
+                '0'...'9' => {}, // TODO: read 2-digit CSI
+                else => {},
+            }
+        },
+        'A' => try state.editHistoryNext(.prev),
+        'B' => try state.editHistoryNext(.next),
+        'C' => try state.editMoveRight(),
+        'D' => try state.editMoveLeft(),
+        'H' => try state.editMoveHome(),
+        'F' => try state.editMoveEnd(),
+        else => {},
+    }
+}
+
+fn editEscape(state: *LinenoiseState) !void {
+    const in = state.stdin;
+    var input_buf: [1]u8 = undefined;
+
+    if ((try term.read(in, &input_buf)) < 1) return error.EndOfFile;
+    switch (input_buf[0]) {
+        'b' => try state.editMoveWordStart(),
+        'f' => try state.editMoveWordEnd(),
+        '[' => try editCsi(state),
+        '0' => {
+            if ((try term.read(in, &input_buf)) < 1) return error.EndOfFile;
+            switch (input_buf[0]) {
+                'H' => try state.editMoveHome(),
+                'F' => try state.editMoveEnd(),
+                else => {},
+            }
+        },
+        else => {},
+    }
+}
+
 fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
     var state = LinenoiseState.init(ln, in, out, prompt);
     defer state.buf.deinit(state.allocator);
@@ -83,55 +150,9 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
             key_ctrl_t => try state.editSwapPrev(),
             key_ctrl_u => try state.editKillLineBackward(),
             key_ctrl_w => try state.editDeletePrevWord(),
-            key_esc => {
-                if ((try term.read(in, &input_buf)) < 1) return null;
-                switch (input_buf[0]) {
-                    'b' => try state.editMoveWordStart(),
-                    'f' => try state.editMoveWordEnd(),
-                    '[' => {
-                        if ((try term.read(in, &input_buf)) < 1) return null;
-                        switch (input_buf[0]) {
-                            '0'...'9' => |num| {
-                                if ((try in.read(&input_buf)) < 1) return null;
-                                switch (input_buf[0]) {
-                                    '~' => switch (num) {
-                                        '1', '7' => try state.editMoveHome(),
-                                        '3' => try state.editDelete(),
-                                        '4', '8' => try state.editMoveEnd(),
-                                        else => {},
-                                    },
-                                    '0'...'9' => {}, // TODO: read 2-digit CSI
-                                    else => {},
-                                }
-                            },
-                            'A' => try state.editHistoryNext(.prev),
-                            'B' => try state.editHistoryNext(.next),
-                            'C' => try state.editMoveRight(),
-                            'D' => try state.editMoveLeft(),
-                            'H' => try state.editMoveHome(),
-                            'F' => try state.editMoveEnd(),
-                            else => {},
-                        }
-                    },
-                    '0' => {
-                        if ((try term.read(in, &input_buf)) < 1) return null;
-                        switch (input_buf[0]) {
-                            'H' => try state.editMoveHome(),
-                            'F' => try state.editMoveEnd(),
-                            else => {},
-                        }
-                    },
-                    else => {},
-                }
-            },
-            '5' => {
-                if ((try term.read(in, &input_buf)) < 1) return null;
-
-                switch (input_buf[0]) {
-                    'C' => try state.editMoveWordEnd(), // ESC[1;5C = ctrl + right arrow
-                    'D' => try state.editMoveWordStart(), // ESC[1;5D = ctrl + left arrow
-                    else => {},
-                }
+            key_esc => editEscape(&state) catch |err| switch (err) {
+                error.EndOfFile => return null,
+                else => return err,
             },
             key_backspace, key_ctrl_h => try state.editBackspace(),
             else => {
