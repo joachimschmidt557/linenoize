@@ -203,6 +203,7 @@ pub const Linenoise = struct {
     completions_callback: ?CompletionsCallback = null,
     stdin_file: File,
     stdout_file: File,
+    /// Go to a new line after linenoise finishes (default is true)
     print_newline: bool = true,
 
     const Self = @This();
@@ -219,12 +220,15 @@ pub const Linenoise = struct {
         return self;
     }
 
-    pub fn initWithHandles(allocator: Allocator, input: std.fs.File.Handle, output: std.fs.File.Handle) Self {
+    /// Initialize a linenoise struct with specific input and output streams
+    /// Use this method to connect linenoise to the files of your choosing
+    /// like /dev/tty on Linux or \\.\CONIN$ on Windows
+    pub fn initWithHandles(allocator: Allocator, input: std.fs.File, output: std.fs.File) Self {
         var self = Self{
             .allocator = allocator,
             .history = History.empty(allocator),
-            .stdin_file = .{ .handle = input },
-            .stdout_file = .{ .handle = output },
+            .stdin_file = input,
+            .stdout_file = output,
         };
         self.examineStdIo();
         return self;
