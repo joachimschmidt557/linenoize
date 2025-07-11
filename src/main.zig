@@ -171,9 +171,8 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
 /// Read a line with custom line editing mechanics. This includes hints,
 /// completions and history
 fn linenoiseRaw(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
-    defer {
-        if (ln.print_newline)
-            out.writeAll("\n") catch {};
+    if (ln.print_newline) {
+        defer out.writeAll("\n") catch {};
     }
 
     const orig = try enableRawMode(in, out);
@@ -210,20 +209,13 @@ pub const Linenoise = struct {
 
     /// Initialize a linenoise struct
     pub fn init(allocator: Allocator) Self {
-        var self: Self = .{
-            .allocator = allocator,
-            .history = History.empty(allocator),
-            .stdin_file = std.io.getStdIn(),
-            .stdout_file = std.io.getStdOut(),
-        };
-        self.examineStdIo();
-        return self;
+        return initWithFiles(allocator, std.io.getStdIn(), std.io.getStdOut());
     }
 
     /// Initialize a linenoise struct with specific input and output streams
     /// Use this method to connect linenoise to the files of your choosing
     /// like /dev/tty on Linux or \\.\CONIN$ on Windows
-    pub fn initWithHandles(allocator: Allocator, input: std.fs.File, output: std.fs.File) Self {
+    pub fn initWithFiles(allocator: Allocator, input: std.fs.File, output: std.fs.File) Self {
         var self = Self{
             .allocator = allocator,
             .history = History.empty(allocator),
