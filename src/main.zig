@@ -171,7 +171,10 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
 /// Read a line with custom line editing mechanics. This includes hints,
 /// completions and history
 fn linenoiseRaw(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
-    defer out.writeAll("\n") catch {};
+    defer {
+        if (ln.print_newline)
+            out.writeAll("\n") catch {};
+    }
 
     const orig = try enableRawMode(in, out);
     defer disableRawMode(in, out, orig);
@@ -198,14 +201,27 @@ pub const Linenoise = struct {
     term_supported: bool = false,
     hints_callback: ?HintsCallback = null,
     completions_callback: ?CompletionsCallback = null,
+    stdin_file: File,
+    stdout_file: File,
+    /// Go to a new line after linenoise finishes (default is true)
+    print_newline: bool = true,
 
     const Self = @This();
 
     /// Initialize a linenoise struct
     pub fn init(allocator: Allocator) Self {
-        var self: Self = .{
+        return initWithFiles(allocator, std.io.getStdIn(), std.io.getStdOut());
+    }
+
+    /// Initialize a linenoise struct with specific input and output streams
+    /// Use this method to connect linenoise to the files of your choosing
+    /// like /dev/tty on Linux or \\.\CONIN$ on Windows
+    pub fn initWithFiles(allocator: Allocator, input: std.fs.File, output: std.fs.File) Self {
+        var self = Self{
             .allocator = allocator,
             .history = History.empty(allocator),
+            .stdin_file = input,
+            .stdout_file = output,
         };
         self.examineStdIo();
         return self;
@@ -220,24 +236,20 @@ pub const Linenoise = struct {
     /// check if line editing and prompt printing should be
     /// enabled or not.
     pub fn examineStdIo(self: *Self) void {
-        const stdin_file = std.io.getStdIn();
-        self.is_tty = stdin_file.isTty();
+        self.is_tty = self.stdin_file.isTty();
         self.term_supported = !isUnsupportedTerm(self.allocator);
     }
 
     /// Reads a line from the terminal. Caller owns returned memory
     pub fn linenoise(self: *Self, prompt: []const u8) !?[]const u8 {
-        const stdin_file = std.io.getStdIn();
-        const stdout_file = std.io.getStdOut();
-
         if (self.is_tty and !self.term_supported) {
-            try stdout_file.writeAll(prompt);
+            try self.stdout_file.writeAll(prompt);
         }
 
         return if (self.is_tty and self.term_supported)
-            try linenoiseRaw(self, stdin_file, stdout_file, prompt)
+            try linenoiseRaw(self, self.stdin_file, self.stdout_file, prompt)
         else
-            try linenoiseNoTTY(self.allocator, stdin_file);
+            try linenoiseNoTTY(self.allocator, self.stdin_file);
     }
 };
 
