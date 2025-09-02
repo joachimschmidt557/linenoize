@@ -1,12 +1,12 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const ArrayListUnmanaged = std.ArrayListUnmanaged;
+const ArrayList = std.ArrayList;
 
 const max_line_len = 4096;
 
 pub const History = struct {
     allocator: Allocator,
-    hist: ArrayListUnmanaged([]const u8) = .empty,
+    hist: ArrayList([]const u8) = .empty,
     max_len: usize = 100,
     current: usize = 0,
 
@@ -58,12 +58,14 @@ pub const History = struct {
         const file = try std.fs.cwd().openFile(path, .{});
         defer file.close();
 
-        const reader = file.reader();
-        while (reader.readUntilDelimiterAlloc(self.allocator, '\n', max_line_len)) |line| {
-            try self.hist.append(self.allocator, line);
+        const buffer = try self.allocator.alloc(u8, max_line_len);
+        defer self.allocator.free(buffer);
+        var reader = file.reader(buffer);
+        while (reader.interface.takeDelimiterExclusive('\n')) |line| {
+            try self.hist.append(self.allocator, try self.allocator.dupe(u8, line));
         } else |err| {
             switch (err) {
-                error.EndOfStream => return,
+                error.EndOfStream => {},
                 else => return err,
             }
         }

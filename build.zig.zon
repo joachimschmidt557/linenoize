@@ -4,8 +4,8 @@
     .version = "0.1.1",
     .dependencies = .{
         .wcwidth = .{
-            .url = "git+https://github.com/joachimschmidt557/zig-wcwidth?ref=v0.1.0#4f5c8efa838da57c9e1b14506138936964835999",
-            .hash = "wcwidth-0.1.0-A4Aa6obmAAC40epfTYwhsdITDO3M6dHEWf6C0jeGMWrV",
+            .url = "git+https://github.com/joachimschmidt557/zig-wcwidth?ref=v0.1.0#2c9a874174e9c0777cbfa0b43e6f77335d88553b",
+            .hash = "wcwidth-0.1.0-A4Aa6gjnAAAQr7TohWS9M7qpfH5-OUF5YN3wjR7VNy97",
         },
     },
     .paths = .{

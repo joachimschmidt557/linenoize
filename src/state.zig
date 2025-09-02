@@ -1,9 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
-const ArrayListUnmanaged = std.ArrayListUnmanaged;
 const File = std.fs.File;
-const bufferedWriter = std.io.bufferedWriter;
 const math = std.math;
 
 const Linenoise = @import("main.zig").Linenoise;
@@ -88,7 +86,7 @@ fn calculateStartOrEnd(
 ) !usize {
     // Create a mapping from unicode codepoint indices to buf
     // indices
-    var map = try std.ArrayListUnmanaged(usize).initCapacity(allocator, buf.len);
+    var map = try std.ArrayList(usize).initCapacity(allocator, buf.len);
     defer map.deinit(allocator);
 
     var utf8 = (try std.unicode.Utf8View.init(buf)).iterator();
@@ -123,7 +121,7 @@ pub const LinenoiseState = struct {
 
     stdin: File,
     stdout: File,
-    buf: ArrayListUnmanaged(u8) = .empty,
+    buf: ArrayList(u8) = .empty,
     prompt: []const u8,
     pos: usize = 0,
     old_pos: usize = 0,
@@ -177,8 +175,8 @@ pub const LinenoiseState = struct {
 
                     // Restore original buffer into state
                     self.buf.deinit(self.allocator);
-                    var new_buf = ArrayList(u8).fromOwnedSlice(self.allocator, old_buf);
-                    self.buf = new_buf.moveToUnmanaged();
+                    const new_buf = ArrayList(u8).fromOwnedSlice(old_buf);
+                    self.buf = new_buf;
                     self.pos = old_pos;
                 } else {
                     // Return to original line
@@ -231,8 +229,9 @@ pub const LinenoiseState = struct {
     }
 
     fn refreshSingleLine(self: *Self) !void {
-        var buf = bufferedWriter(self.stdout.writer());
-        var writer = buf.writer();
+        var buf: [1024]u8 = undefined;
+        var stdout_writer = self.stdout.writer(&buf);
+        const writer = &stdout_writer.interface;
 
         const hint = try self.getHint();
         defer if (hint) |str| self.allocator.free(str);
@@ -305,15 +304,16 @@ pub const LinenoiseState = struct {
 
         // Move cursor to original position
         const cursor_pos = if (pos > avail_space) self.cols - display_hint_width - 1 else display_prompt_width + pos;
-        try writer.print("\r\x1b[{}C", .{cursor_pos});
+        if (cursor_pos > 0) try writer.print("\r\x1b[{}C", .{cursor_pos});
 
         // Write buffer
-        try buf.flush();
+        try writer.flush();
     }
 
     fn refreshMultiLine(self: *Self) !void {
-        var buf = bufferedWriter(self.stdout.writer());
-        var writer = buf.writer();
+        var buf: [1024]u8 = undefined;
+        var stdout_writer = self.stdout.writer(&buf);
+        const writer = &stdout_writer.interface;
 
         const hint = try self.getHint();
         defer if (hint) |str| self.allocator.free(str);
@@ -393,7 +393,7 @@ pub const LinenoiseState = struct {
 
         self.old_pos = pos;
 
-        try buf.flush();
+        try writer.flush();
     }
 
     pub fn refreshLine(self: *Self) !void {

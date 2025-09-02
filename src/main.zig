@@ -172,8 +172,10 @@ fn linenoiseEdit(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]co
 /// completions and history
 fn linenoiseRaw(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]const u8 {
     defer {
-        if (ln.print_newline)
-            out.writeAll("\n") catch {};
+        if (ln.print_newline) {
+            ln.stdout_writer.interface.writeAll("\n") catch {};
+            ln.stdout_writer.interface.flush() catch {};
+        }
     }
 
     const orig = try enableRawMode(in, out);
@@ -184,9 +186,13 @@ fn linenoiseRaw(ln: *Linenoise, in: File, out: File, prompt: []const u8) !?[]con
 
 /// Read a line with no special features (no hints, no completions, no history)
 fn linenoiseNoTTY(allocator: Allocator, stdin: File) !?[]const u8 {
-    var reader = stdin.reader();
     const max_line_len = std.math.maxInt(usize);
-    return reader.readUntilDelimiterAlloc(allocator, '\n', max_line_len) catch |e| switch (e) {
+    const buf = try allocator.alloc(u8, max_line_len);
+    var stdin_reader = stdin.reader(buf);
+    var reader = &stdin_reader.interface;
+    return reader.takeDelimiterInclusive(
+        '\n',
+    ) catch |e| switch (e) {
         error.EndOfStream => return null,
         else => return e,
     };
@@ -203,6 +209,8 @@ pub const Linenoise = struct {
     completions_callback: ?CompletionsCallback = null,
     stdin_file: File,
     stdout_file: File,
+    stdin_reader: std.fs.File.Reader,
+    stdout_writer: std.fs.File.Writer,
     /// Go to a new line after linenoise finishes (default is true)
     print_newline: bool = true,
 
@@ -210,18 +218,23 @@ pub const Linenoise = struct {
 
     /// Initialize a linenoise struct
     pub fn init(allocator: Allocator) Self {
-        return initWithFiles(allocator, std.io.getStdIn(), std.io.getStdOut());
+        return initWithFiles(allocator, std.fs.File.stdin(), std.fs.File.stdout());
     }
 
     /// Initialize a linenoise struct with specific input and output streams
     /// Use this method to connect linenoise to the files of your choosing
     /// like /dev/tty on Linux or \\.\CONIN$ on Windows
     pub fn initWithFiles(allocator: Allocator, input: std.fs.File, output: std.fs.File) Self {
+        const max_buf_len = 1024;
+        const stdin_buf = allocator.alloc(u8, max_buf_len) catch unreachable;
+        const stdout_buf = allocator.alloc(u8, max_buf_len) catch unreachable;
         var self = Self{
             .allocator = allocator,
             .history = History.empty(allocator),
             .stdin_file = input,
             .stdout_file = output,
+            .stdin_reader = input.reader(stdin_buf),
+            .stdout_writer = output.writer(stdout_buf),
         };
         self.examineStdIo();
         return self;
@@ -230,6 +243,8 @@ pub const Linenoise = struct {
     /// Free all resources occupied by this struct
     pub fn deinit(self: *Self) void {
         self.history.deinit();
+        self.allocator.free(self.stdin_reader.interface.buffer);
+        self.allocator.free(self.stdout_writer.interface.buffer);
     }
 
     /// Re-examine (currently) stdin and environment variables to
@@ -243,7 +258,8 @@ pub const Linenoise = struct {
     /// Reads a line from the terminal. Caller owns returned memory
     pub fn linenoise(self: *Self, prompt: []const u8) !?[]const u8 {
         if (self.is_tty and !self.term_supported) {
-            try self.stdout_file.writeAll(prompt);
+            try self.stdout_writer.interface.writeAll(prompt);
+            try self.stdout_writer.interface.flush();
         }
 
         return if (self.is_tty and self.term_supported)

@@ -19,7 +19,8 @@ pub fn build(b: *Build) void {
     });
 
     // Static library
-    const lib = b.addStaticLibrary(.{
+    const lib = b.addLibrary(.{
+        .linkage = .static,
         .name = "linenoise",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/c.zig"),

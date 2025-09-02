@@ -16,22 +16,20 @@ pub fn isUnsupportedTerm(allocator: std.mem.Allocator) bool {
     } else false;
 }
 
-const w = struct {
-    pub usingnamespace std.os.windows;
-    pub const ENABLE_VIRTUAL_TERMINAL_INPUT = @as(c_int, 0x200);
-    pub const CP_UTF8 = @as(c_int, 65001);
-    pub const INPUT_RECORD = extern struct {
-        EventType: w.WORD,
-        _ignored: [16]u8,
-    };
+const w = std.os.windows;
+
+const ENABLE_VIRTUAL_TERMINAL_INPUT = @as(c_int, 0x200);
+const CP_UTF8 = @as(c_int, 65001);
+const INPUT_RECORD = extern struct {
+    EventType: w.WORD,
+    _ignored: [16]u8,
 };
 
-const k32 = struct {
-    pub usingnamespace std.os.windows.kernel32;
-    pub extern "kernel32" fn SetConsoleCP(wCodePageID: w.UINT) callconv(w.WINAPI) w.BOOL;
-    pub extern "kernel32" fn PeekConsoleInputW(hConsoleInput: w.HANDLE, lpBuffer: [*]w.INPUT_RECORD, nLength: w.DWORD, lpNumberOfEventsRead: ?*w.DWORD) callconv(w.WINAPI) w.BOOL;
-    pub extern "kernel32" fn ReadConsoleW(hConsoleInput: w.HANDLE, lpBuffer: [*]u16, nNumberOfCharsToRead: w.DWORD, lpNumberOfCharsRead: ?*w.DWORD, lpReserved: ?*anyopaque) callconv(w.WINAPI) w.BOOL;
-};
+const k32 = std.os.windows.kernel32;
+
+pub extern "kernel32" fn SetConsoleCP(wCodePageID: w.UINT) callconv(.winapi) w.BOOL;
+pub extern "kernel32" fn PeekConsoleInputW(hConsoleInput: w.HANDLE, lpBuffer: [*]INPUT_RECORD, nLength: w.DWORD, lpNumberOfEventsRead: ?*w.DWORD) callconv(.winapi) w.BOOL;
+pub extern "kernel32" fn ReadConsoleW(hConsoleInput: w.HANDLE, lpBuffer: [*]u16, nNumberOfCharsToRead: w.DWORD, lpNumberOfCharsRead: ?*w.DWORD, lpReserved: ?*anyopaque) callconv(.winapi) w.BOOL;
 
 pub fn enableRawMode(in: File, out: File) !termios {
     if (is_windows) {
@@ -39,16 +37,16 @@ pub fn enableRawMode(in: File, out: File) !termios {
             .inMode = 0,
             .outMode = 0,
         };
-        var irec: [1]w.INPUT_RECORD = undefined;
+        var irec: [1]INPUT_RECORD = undefined;
         var n: w.DWORD = 0;
-        if (k32.PeekConsoleInputW(in.handle, &irec, 1, &n) == 0 or
+        if (PeekConsoleInputW(in.handle, &irec, 1, &n) == 0 or
             k32.GetConsoleMode(in.handle, &result.inMode) == 0 or
             k32.GetConsoleMode(out.handle, &result.outMode) == 0)
             return error.InitFailed;
-        _ = k32.SetConsoleMode(in.handle, w.ENABLE_VIRTUAL_TERMINAL_INPUT);
+        _ = k32.SetConsoleMode(in.handle, ENABLE_VIRTUAL_TERMINAL_INPUT);
         _ = k32.SetConsoleMode(out.handle, result.outMode | w.ENABLE_VIRTUAL_TERMINAL_PROCESSING);
-        _ = k32.SetConsoleCP(w.CP_UTF8);
-        _ = k32.SetConsoleOutputCP(w.CP_UTF8);
+        _ = SetConsoleCP(CP_UTF8);
+        _ = k32.SetConsoleOutputCP(CP_UTF8);
         return result;
     } else {
         const orig = try std.posix.tcgetattr(in.handle);
@@ -90,14 +88,18 @@ pub fn disableRawMode(in: File, out: File, orig: termios) void {
 
 fn getCursorPosition(in: File, out: File) !usize {
     var buf: [32]u8 = undefined;
-    var reader = in.reader();
+    var in_reader = in.reader(&buf);
+    var reader = &in_reader.interface;
 
+    var out_buf: [1024]u8 = undefined;
+    var out_writer = out.writer(&out_buf);
+    const writer = &out_writer.interface;
     // Tell terminal to report cursor to in
-    try out.writeAll("\x1B[6n");
+    try writer.writeAll("\x1B[6n");
+    try writer.flush();
 
     // Read answer
-    const answer = (try reader.readUntilDelimiterOrEof(&buf, 'R')) orelse
-        return error.CursorPos;
+    const answer = (try reader.takeDelimiterInclusive('R'));
 
     // Parse answer
     if (!std.mem.startsWith(u8, "\x1B[", answer))
@@ -111,7 +113,9 @@ fn getCursorPosition(in: File, out: File) !usize {
 }
 
 fn getColumnsFallback(in: File, out: File) !usize {
-    var writer = out.writer();
+    var buf: [1024]u8 = undefined;
+    var out_writer = out.writer(&buf);
+    const writer = &out_writer.interface;
     const orig_cursor_pos = try getCursorPosition(in, out);
 
     try writer.print("\x1B[999C", .{});
@@ -148,13 +152,19 @@ pub fn getColumns(in: File, out: File) !usize {
 }
 
 pub fn clearScreen() !void {
-    const stdout = std.io.getStdErr();
-    try stdout.writeAll("\x1b[H\x1b[2J");
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const writer = &stderr_writer.interface;
+    try writer.writeAll("\x1b[H\x1b[2J");
+    try writer.flush();
 }
 
 pub fn beep() !void {
-    const stderr = std.io.getStdErr();
-    try stderr.writeAll("\x07");
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const writer = &stderr_writer.interface;
+    try writer.writeAll("\x07");
+    try writer.flush();
 }
 
 var utf8ConsoleBuffer = [_]u8{0} ** 10;
@@ -175,13 +185,13 @@ fn readWin32Console(self: File, buffer: []u8) !usize {
         }
         var charsRead: w.DWORD = 0;
         var wideBuf: [2]w.WCHAR = undefined;
-        if (k32.ReadConsoleW(self.handle, &wideBuf, 1, &charsRead, null) == 0)
+        if (ReadConsoleW(self.handle, &wideBuf, 1, &charsRead, null) == 0)
             return 0;
         if (charsRead == 0)
             break;
         const wideBufLen: u8 = if (wideBuf[0] >= 0xD800 and wideBuf[0] <= 0xDBFF) _: {
             // read surrogate
-            if (k32.ReadConsoleW(self.handle, wideBuf[1..], 1, &charsRead, null) == 0)
+            if (ReadConsoleW(self.handle, wideBuf[1..], 1, &charsRead, null) == 0)
                 return 0;
             if (charsRead == 0)
                 break;
