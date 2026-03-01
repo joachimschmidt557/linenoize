@@ -3,7 +3,7 @@
 A port of [linenoise](https://github.com/antirez/linenoise) to zig
 aiming to be a simple readline for command-line applications written
 in zig. It is written in pure zig and doesn't require
-libc. `linenoize` works with the latest stable zig version (0.14.0).
+libc. `linenoize` works with the latest stable zig version (0.15.2).
 
 In addition to being a full-fledged zig library, `linenoize` also
 serves as a drop-in replacement for linenoise. As a proof of concept,

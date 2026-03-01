@@ -19,13 +19,14 @@ pub fn build(b: *Build) void {
     });
 
     // Static library
-    const lib = b.addStaticLibrary(.{
+    const lib = b.addLibrary(.{
         .name = "linenoise",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/c.zig"),
             .target = target,
             .optimize = optimize,
         }),
+        .linkage = .static,
     });
     lib.root_module.addImport("wcwidth", wcwidth);
     lib.linkLibC();
