@@ -8,10 +8,10 @@ const Linenoise = @import("linenoise").Linenoise;
 
 fn completion(allocator: Allocator, buf: []const u8) ![]const []const u8 {
     if (std.mem.eql(u8, "z", buf)) {
-        var result = ArrayList([]const u8).init(allocator);
-        try result.append(try allocator.dupe(u8, "zig"));
-        try result.append(try allocator.dupe(u8, "ziglang"));
-        return result.toOwnedSlice();
+        var result: ArrayList([]const u8) = .empty;
+        try result.append(allocator, try allocator.dupe(u8, "zig"));
+        try result.append(allocator, try allocator.dupe(u8, "ziglang"));
+        return result.toOwnedSlice(allocator);
     } else {
         return &[_][]const u8{};
     }
