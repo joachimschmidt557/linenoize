@@ -58,14 +58,15 @@ pub const History = struct {
         const file = try std.fs.cwd().openFile(path, .{});
         defer file.close();
 
-        const reader = file.reader();
-        while (reader.readUntilDelimiterAlloc(self.allocator, '\n', max_line_len)) |line| {
-            try self.hist.append(self.allocator, line);
-        } else |err| {
-            switch (err) {
-                error.EndOfStream => return,
-                else => return err,
-            }
+        var read_buf: [4096]u8 = undefined;
+        var reader = file.reader(&read_buf);
+        while (true) {
+            const maybe_line = reader.interface.takeDelimiter('\n') catch |err| switch (err) {
+                error.StreamTooLong => return err,
+                error.ReadFailed => return err,
+            };
+            const line = maybe_line orelse break;
+            try self.hist.append(self.allocator, try self.allocator.dupe(u8, line));
         }
 
         self.truncate();

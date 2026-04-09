@@ -16,22 +16,51 @@ pub fn isUnsupportedTerm(allocator: std.mem.Allocator) bool {
     } else false;
 }
 
-const w = struct {
-    pub usingnamespace std.os.windows;
+const w = if (is_windows) struct {
+    const windows = std.os.windows;
+    pub const DWORD = windows.DWORD;
+    pub const WORD = windows.WORD;
+    pub const UINT = windows.UINT;
+    pub const BOOL = windows.BOOL;
+    pub const HANDLE = windows.HANDLE;
+    pub const WCHAR = windows.WCHAR;
+    pub const WINAPI = windows.WINAPI;
+    pub const CONSOLE_SCREEN_BUFFER_INFO = windows.CONSOLE_SCREEN_BUFFER_INFO;
+    pub const ENABLE_VIRTUAL_TERMINAL_PROCESSING = windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING;
     pub const ENABLE_VIRTUAL_TERMINAL_INPUT = @as(c_int, 0x200);
     pub const CP_UTF8 = @as(c_int, 65001);
     pub const INPUT_RECORD = extern struct {
-        EventType: w.WORD,
+        EventType: WORD,
+        _ignored: [16]u8,
+    };
+} else struct {
+    pub const DWORD = u32;
+    pub const WORD = u16;
+    pub const UINT = u32;
+    pub const BOOL = i32;
+    pub const HANDLE = *anyopaque;
+    pub const WCHAR = u16;
+    pub const WINAPI = void;
+    pub const CONSOLE_SCREEN_BUFFER_INFO = void;
+    pub const ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0;
+    pub const ENABLE_VIRTUAL_TERMINAL_INPUT = @as(c_int, 0x200);
+    pub const CP_UTF8 = @as(c_int, 65001);
+    pub const INPUT_RECORD = extern struct {
+        EventType: WORD,
         _ignored: [16]u8,
     };
 };
 
-const k32 = struct {
-    pub usingnamespace std.os.windows.kernel32;
+const k32 = if (is_windows) struct {
+    const kernel32 = std.os.windows.kernel32;
+    pub const GetConsoleMode = kernel32.GetConsoleMode;
+    pub const SetConsoleMode = kernel32.SetConsoleMode;
+    pub const SetConsoleOutputCP = kernel32.SetConsoleOutputCP;
+    pub const GetConsoleScreenBufferInfo = kernel32.GetConsoleScreenBufferInfo;
     pub extern "kernel32" fn SetConsoleCP(wCodePageID: w.UINT) callconv(w.WINAPI) w.BOOL;
     pub extern "kernel32" fn PeekConsoleInputW(hConsoleInput: w.HANDLE, lpBuffer: [*]w.INPUT_RECORD, nLength: w.DWORD, lpNumberOfEventsRead: ?*w.DWORD) callconv(w.WINAPI) w.BOOL;
     pub extern "kernel32" fn ReadConsoleW(hConsoleInput: w.HANDLE, lpBuffer: [*]u16, nNumberOfCharsToRead: w.DWORD, lpNumberOfCharsRead: ?*w.DWORD, lpReserved: ?*anyopaque) callconv(w.WINAPI) w.BOOL;
-};
+} else struct {};
 
 pub fn enableRawMode(in: File, out: File) !termios {
     if (is_windows) {
@@ -90,17 +119,23 @@ pub fn disableRawMode(in: File, out: File, orig: termios) void {
 
 fn getCursorPosition(in: File, out: File) !usize {
     var buf: [32]u8 = undefined;
-    var reader = in.reader();
 
     // Tell terminal to report cursor to in
     try out.writeAll("\x1B[6n");
 
     // Read answer
-    const answer = (try reader.readUntilDelimiterOrEof(&buf, 'R')) orelse
-        return error.CursorPos;
+    var total: usize = 0;
+    while (total < buf.len) {
+        const n = try in.read(buf[total .. total + 1]);
+        if (n == 0) return error.CursorPos;
+        if (buf[total] == 'R') break;
+        total += 1;
+    } else return error.CursorPos;
+
+    const answer = buf[0..total];
 
     // Parse answer
-    if (!std.mem.startsWith(u8, "\x1B[", answer))
+    if (!std.mem.startsWith(u8, answer, "\x1B["))
         return error.CursorPos;
 
     var iter = std.mem.splitScalar(u8, answer[2..], ';');
@@ -111,13 +146,14 @@ fn getCursorPosition(in: File, out: File) !usize {
 }
 
 fn getColumnsFallback(in: File, out: File) !usize {
-    var writer = out.writer();
     const orig_cursor_pos = try getCursorPosition(in, out);
 
-    try writer.print("\x1B[999C", .{});
+    try out.writeAll("\x1B[999C");
     const cols = try getCursorPosition(in, out);
 
-    try writer.print("\x1B[{}D", .{orig_cursor_pos});
+    var move_buf: [32]u8 = undefined;
+    const move_str = std.fmt.bufPrint(&move_buf, "\x1B[{}D", .{orig_cursor_pos}) catch return error.CursorPos;
+    try out.writeAll(move_str);
 
     return cols;
 }
@@ -148,12 +184,12 @@ pub fn getColumns(in: File, out: File) !usize {
 }
 
 pub fn clearScreen() !void {
-    const stdout = std.io.getStdErr();
-    try stdout.writeAll("\x1b[H\x1b[2J");
+    const stderr = std.fs.File.stderr();
+    try stderr.writeAll("\x1b[H\x1b[2J");
 }
 
 pub fn beep() !void {
-    const stderr = std.io.getStdErr();
+    const stderr = std.fs.File.stderr();
     try stderr.writeAll("\x07");
 }
 

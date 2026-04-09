@@ -3,7 +3,6 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const ArrayListUnmanaged = std.ArrayListUnmanaged;
 const File = std.fs.File;
-const bufferedWriter = std.io.bufferedWriter;
 const math = std.math;
 
 const Linenoise = @import("main.zig").Linenoise;
@@ -177,8 +176,7 @@ pub const LinenoiseState = struct {
 
                     // Restore original buffer into state
                     self.buf.deinit(self.allocator);
-                    var new_buf = ArrayList(u8).fromOwnedSlice(self.allocator, old_buf);
-                    self.buf = new_buf.moveToUnmanaged();
+                    self.buf = ArrayListUnmanaged(u8).fromOwnedSlice(old_buf);
                     self.pos = old_pos;
                 } else {
                     // Return to original line
@@ -231,8 +229,9 @@ pub const LinenoiseState = struct {
     }
 
     fn refreshSingleLine(self: *Self) !void {
-        var buf = bufferedWriter(self.stdout.writer());
-        var writer = buf.writer();
+        var write_buf: [4096]u8 = undefined;
+        var file_writer = self.stdout.writerStreaming(&write_buf);
+        var writer = &file_writer.interface;
 
         const hint = try self.getHint();
         defer if (hint) |str| self.allocator.free(str);
@@ -307,13 +306,14 @@ pub const LinenoiseState = struct {
         const cursor_pos = if (pos > avail_space) self.cols - display_hint_width - 1 else display_prompt_width + pos;
         try writer.print("\r\x1b[{}C", .{cursor_pos});
 
-        // Write buffer
-        try buf.flush();
+        // Flush buffer
+        try writer.flush();
     }
 
     fn refreshMultiLine(self: *Self) !void {
-        var buf = bufferedWriter(self.stdout.writer());
-        var writer = buf.writer();
+        var write_buf: [4096]u8 = undefined;
+        var file_writer = self.stdout.writerStreaming(&write_buf);
+        var writer = &file_writer.interface;
 
         const hint = try self.getHint();
         defer if (hint) |str| self.allocator.free(str);
@@ -393,7 +393,7 @@ pub const LinenoiseState = struct {
 
         self.old_pos = pos;
 
-        try buf.flush();
+        try writer.flush();
     }
 
     pub fn refreshLine(self: *Self) !void {

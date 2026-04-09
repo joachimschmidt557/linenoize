@@ -26,9 +26,9 @@ const LinenoiseCompletions = extern struct {
     }
 };
 
-const linenoiseCompletionCallback = *const fn ([*:0]const u8, *LinenoiseCompletions) callconv(.C) void;
-const linenoiseHintsCallback = *const fn ([*:0]const u8, *c_int, *c_int) callconv(.C) ?[*:0]u8;
-const linenoiseFreeHintsCallback = *const fn (*anyopaque) callconv(.C) void;
+const linenoiseCompletionCallback = *const fn ([*:0]const u8, *LinenoiseCompletions) callconv(.c) void;
+const linenoiseHintsCallback = *const fn ([*:0]const u8, *c_int, *c_int) callconv(.c) ?[*:0]u8;
+const linenoiseFreeHintsCallback = *const fn (*anyopaque) callconv(.c) void;
 
 export fn linenoiseSetCompletionCallback(fun: linenoiseCompletionCallback) void {
     c_completion_callback = fun;
@@ -49,15 +49,13 @@ export fn linenoiseSetFreeHintsCallback(fun: linenoiseFreeHintsCallback) void {
 export fn linenoiseAddCompletion(lc: *LinenoiseCompletions, str: [*:0]const u8) void {
     const dupe = global_allocator.dupeZ(u8, mem.span(str)) catch return;
 
-    var completions: std.ArrayList([*:0]u8) = undefined;
-    if (lc.cvec) |raw_completions| {
-        completions = std.ArrayList([*:0]u8).fromOwnedSlice(global_allocator, raw_completions[0..lc.len]);
-    } else {
-        completions = std.ArrayList([*:0]u8).init(global_allocator);
-    }
+    var completions: std.ArrayList([*:0]u8) = if (lc.cvec) |raw_completions|
+        std.ArrayList([*:0]u8).fromOwnedSlice(raw_completions[0..lc.len])
+    else
+        .empty;
 
-    completions.append(dupe) catch return;
-    const slice = completions.toOwnedSlice() catch return;
+    completions.append(global_allocator, dupe) catch return;
+    const slice = completions.toOwnedSlice(global_allocator) catch return;
     lc.cvec = slice.ptr;
     lc.len += 1;
 }
